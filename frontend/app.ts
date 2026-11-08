@@ -52,7 +52,8 @@ function renderIdentity() {
   $('#side-status').textContent = state.user?.name ? 'YOUR MUSIC, YOUR WAVE' : '音楽でつながろう';
   $('#side-avatar').className = `avatar small ${colorOf(state.user?.color)}`;
   $('#side-avatar').textContent = state.user?.name?.slice(0, 1) || '♪';
-  $('#join-label').textContent = state.demo ? 'ライブに参加する' : '参加中 · イベントを見る';
+  $('#join-label').textContent = state.demo ? 'ライブに参加する' : '参加中';
+  $$<HTMLButtonElement>('[data-action="join"]').forEach(button => button.disabled = !state.demo);
   $('#event-kicker').textContent = state.demo ? "TODAY'S PICK" : 'YOU ARE IN THIS WAVE';
 }
 function renderEvent() {
@@ -62,8 +63,6 @@ function renderEvent() {
   $('#event-subtitle').textContent = event.subtitle;
   $('#event-venue').textContent = event.venue;
   $('#event-date').textContent = event.date;
-  $('#track-song').textContent = event.song;
-  $('#track-artist').textContent = event.artist;
   renderIdentity();
 }
 function setConnection(status: string) {
@@ -117,14 +116,14 @@ async function react() {
 }
 function profileForm(joinAfter = false) {
   pendingJoin = joinAfter;
-  const user = state.user || { name: '', artist: '', song: '', color: 'pink', visible: false };
-  openModal(`<div class="modal-inner">${closeButton}<div class="stepper"><span class="active">01 PROFILE</span><i></i><span>02 READY</span><i></i><span>03 LIVE</span></div><svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">LET'S FIND YOUR WAVE.</div><h2>${user.name ? 'プロフィールを編集' : '「好き」で、つながろう。'}</h2><p class="modal-description">あなたの音楽を、少しだけ教えてください。<br>名前や連絡先の交換なしで、同じ気持ちを共有できます。</p><form id="profile-form"><label class="form-field"><span>ニックネーム <small>必須 · 20文字以内</small></span><input name="name" autocomplete="nickname" placeholder="例：haru" required maxlength="20" value="${escape(user.name)}"></label><div class="form-row"><label class="form-field"><span>好きなアーティスト</span><input name="artist" placeholder="例：YOASOBI" maxlength="60" value="${escape(user.artist)}"></label><label class="form-field"><span>好きな曲</span><input name="song" placeholder="例：群青" maxlength="60" value="${escape(user.song)}"></label></div><div class="form-field"><span>あなたのカラー</span><div class="color-selector">${colors.map(color => `<button type="button" class="color-choice ${colorOf(user.color) === color ? 'selected' : ''}" data-color="${color}" aria-label="${({pink:'ピンク',blue:'ブルー',purple:'パープル',orange:'オレンジ'})[color]}" aria-pressed="${colorOf(user.color) === color}"><span class="avatar small ${color}">♪</span></button>`).join('')}</div><input type="hidden" name="color" value="${colorOf(user.color)}"></div><label class="consent"><input type="checkbox" name="visible" ${user.visible ? 'checked' : ''}><span>公開プロフィールを共有し、共感メモリに残す<small>ニックネーム・好きな曲・アーティストを共有します。<br>オフでも、ニックネームとリアクションは参加中に表示されます。</small></span></label><div class="form-error" id="form-error" role="alert"></div><button class="primary-btn full-width" type="submit">${user.name ? '変更を保存する' : 'プロフィールを登録する'} ${icon('arrow')}</button><p class="member-note">このブラウザのCookieでプロフィールを識別します。共有端末では利用にご注意ください。</p></form></div>`);
+  const user = state.user || { name: '', artist: '', song: '', visible: false };
+  openModal(`<div class="modal-inner">${closeButton}<div class="stepper"><span class="active">01 PROFILE</span><i></i><span>02 READY</span><i></i><span>03 LIVE</span></div><svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">LET'S FIND YOUR WAVE.</div><h2>${user.name ? 'プロフィールを編集' : '「好き」で、つながろう。'}</h2><p class="modal-description">あなたの音楽を、少しだけ教えてください。<br>名前や連絡先の交換なしで、同じ気持ちを共有できます。</p><form id="profile-form"><label class="form-field"><span>ニックネーム <small>必須 · 20文字以内</small></span><input name="name" autocomplete="nickname" placeholder="例：haru" required maxlength="20" value="${escape(user.name)}"></label><div class="form-row"><label class="form-field"><span>好きなアーティスト</span><input name="artist" placeholder="例：YOASOBI" maxlength="60" value="${escape(user.artist)}"></label><label class="form-field"><span>好きな曲</span><input name="song" placeholder="例：群青" maxlength="60" value="${escape(user.song)}"></label></div><label class="consent"><input type="checkbox" name="visible" ${user.visible ? 'checked' : ''}><span>公開プロフィールを共有し、共感メモリに残す<small>ニックネーム・好きな曲・アーティストを共有します。<br>オフでも、ニックネームとリアクションは参加中に表示されます。</small></span></label><div class="form-error" id="form-error" role="alert"></div><button class="primary-btn full-width" type="submit">${user.name ? '変更を保存する' : 'プロフィールを登録する'} ${icon('arrow')}</button><p class="member-note">このブラウザのCookieでプロフィールを識別します。共有端末では利用にご注意ください。</p></form></div>`);
 }
 async function saveProfile(form: HTMLFormElement) {
   const button = $<HTMLButtonElement>('button[type="submit"]', form); button.disabled = true;
   const fields = new FormData(form);
   try {
-    state.user = await api('profile', { method: 'PUT', body: JSON.stringify({ name: fields.get('name'), artist: fields.get('artist'), song: fields.get('song'), color: fields.get('color'), visible: fields.get('visible') === 'on' }) });
+    state.user = await api('profile', { method: 'PUT', body: JSON.stringify({ name: fields.get('name'), artist: fields.get('artist'), song: fields.get('song'), color: colorOf(state.user?.color), visible: fields.get('visible') === 'on' }) });
     renderIdentity(); renderProfile();
     if (pendingJoin) showReady(); else { closeModal(); toast('プロフィールを保存しました'); }
   } catch (e) { $('#form-error').textContent = e instanceof Error ? e.message : '保存できませんでした'; button.disabled = false; }
@@ -132,17 +131,14 @@ async function saveProfile(form: HTMLFormElement) {
 function showReady() {
   openModal(`<div class="modal-inner success-modal">${closeButton}<div class="stepper"><span>01 PROFILE</span><i></i><span class="active">02 READY</span><i></i><span>03 LIVE</span></div><div class="success-orb">${icon('check')}</div><div class="eyebrow">YOU'RE READY TO CONNECT.</div><h2>あなたのWAVEを、<br>会場へ届けよう。</h2><p class="modal-description">プロフィールの登録が完了しました。<br>同じ音楽に、心が動く瞬間を。</p><div class="profile-summary">${state.user ? avatar(state.user) : ''}<div><strong>${escape(state.user?.name)}</strong><small>${escape(state.user?.artist)} / ${escape(state.user?.song)}</small></div></div><button class="primary-btn full-width" data-action="enter-live">ライブへ進む ${icon('arrow')}</button></div>`);
 }
-async function joinEvent(eventId: string) {
-  if (!state.user?.name) { state.eventId = eventId; renderEvent(); return profileForm(true); }
-  const buttons = $$<HTMLButtonElement>('[data-action="enter-live"], [data-select-event]'); buttons.forEach(b => b.disabled = true);
+async function joinEvent() {
+  if (!state.user?.name) return profileForm(true);
+  const buttons = $$<HTMLButtonElement>('[data-action="enter-live"], [data-action="join"]'); buttons.forEach(b => b.disabled = true);
   try {
-    await api('join', { method: 'POST', body: JSON.stringify({ eventId }) });
-    state.eventId = eventId; if (state.user) state.user.eventId = eventId; state.demo = false; state.taps = 0; state.level = 0; state.participants = [];
+    await api('join', { method: 'POST', body: JSON.stringify({ eventId: state.eventId }) });
+    if (state.user) state.user.eventId = state.eventId; state.demo = false; state.taps = 0; state.level = 0; state.participants = [];
     closeModal(); renderEvent(); renderBubbles(); renderMeter(); connect(); navigate('live'); toast('接続しました。同じ瞬間を楽しもう！');
   } catch (e) { toast(e instanceof Error ? e.message : '接続に問題が発生しました'); buttons.forEach(b => b.disabled = false); }
-}
-function eventPicker() {
-  openModal(`<div class="modal-inner">${closeButton}<div class="eyebrow">FIND YOUR NEXT WAVE.</div><h2>どのライブで、つながる？</h2><p class="modal-description">MVP用のサンプルイベントです。<br>同じルームを選ぶと、参加者間でリアクションが届きます。</p>${state.events.map(e => `<button class="event-option ${e.id === state.eventId ? 'selected' : ''}" data-select-event="${escape(e.id)}"><span class="event-icon">${icon('music')}</span><span><strong>${escape(e.name)}</strong><small>${escape(e.venue)}</small><small>${escape(e.date)} · ${escape(e.time)}</small></span>${icon(e.id === state.eventId ? 'check' : 'chevron')}</button>`).join('')}<p class="member-note">位置情報やBluetoothは使いません。イベント名・出演者・会場はデモ用の架空設定です。</p></div>`);
 }
 async function refreshMemories() {
   if (state.user) {
@@ -180,19 +176,14 @@ function personProfile(id: string) {
   openModal(`<div class="modal-inner success-modal">${closeButton}<div class="eyebrow">${state.demo ? 'DEMO PARTICIPANT' : 'ON THE SAME WAVE'}</div><div class="profile-person">${avatar(person, 'large')}</div><h2>${escape(person.name)}</h2><p class="modal-description">${state.demo ? 'デモ参加者のサンプルプロフィールです。' : person.artist || person.song ? '同じライブを楽しんでいる参加者です。' : 'この参加者はプロフィールを公開していません。'}</p>${person.artist ? `<div class="profile-summary">${icon('music')}<div><strong>${escape(person.artist)}</strong><small>${escape(person.song)}</small></div></div>` : ''}<button class="subtle-btn full-width" style="margin-top:20px;justify-content:center" data-action="close">ライブに戻る</button></div>`);
 }
 function about() {
-  openModal(`<div class="modal-inner">${closeButton}<svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">FEEL THE SAME WAVE.</div><h2>音楽でつながる、<br>もっと近くに。</h2><div class="about-text"><p>FESWAVEは、ライブの感動を言葉を使わずに共有するアプリです。<strong>その瞬間の気持ちをタップ</strong>して届けましょう。</p><p>5秒間に1〜2タップでLevel 1、3〜5タップでLevel 2、6タップ以上でLevel 3。同じイベント・同じ時間帯でレベル差が1以内なら共感候補になります。</p><p>双方がプロフィールの共有を許可すると、5秒の集計後にメモリが保存されます。共有をオフにすると、相手の履歴からあなたの記録も削除されます。</p><p>デモ参加者はサンプル表示です。実際の参加者はイベント参加後に表示されます。現在の曲表示も参考情報です。</p><p>v0.2 ローカルMVP · Bluetooth、Spotify、位置推定、アカウント認証は未実装です。サーバー側に履歴を保存し、Cookieで端末を識別します。</p></div><button class="primary-btn full-width" data-action="close">LET'S FEEL THE WAVE ${icon('arrow')}</button></div>`);
+  openModal(`<div class="modal-inner">${closeButton}<svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">FEEL THE SAME WAVE.</div><h2>音楽でつながる、<br>もっと近くに。</h2><div class="about-text"><p>FESWAVEは、ライブの感動を言葉を使わずに共有するアプリです。<strong>その瞬間の気持ちをタップ</strong>して届けましょう。</p><p>5秒間に1〜2タップでLevel 1、3〜5タップでLevel 2、6タップ以上でLevel 3。同じイベント・同じ時間帯でレベル差が1以内なら共感候補になります。</p><p>双方がプロフィールの共有を許可すると、5秒の集計後にメモリが保存されます。共有をオフにすると、相手の履歴からあなたの記録も削除されます。</p><p>デモ参加者はサンプル表示です。実際の参加者はイベント参加後に表示されます。</p><p>v0.2 ローカルMVP · Bluetooth、Spotify、位置推定、アカウント認証は未実装です。サーバー側に履歴を保存し、Cookieで端末を識別します。</p></div><button class="primary-btn full-width" data-action="close">LET'S FEEL THE WAVE ${icon('arrow')}</button></div>`);
 }
 document.addEventListener('click', async event => {
   const target = (event.target instanceof Element ? event.target.closest('button') : null); if (!target) return;
   if (target.dataset.page) return navigate(target.dataset.page);
-  if (target.dataset.selectEvent) return joinEvent(target.dataset.selectEvent);
   if (target.dataset.person) return personProfile(target.dataset.person);
   if (target.dataset.filter) {
     state.filter = target.dataset.filter === 'favorite' ? 'favorite' : 'all'; $$('[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === state.filter)); renderMemories(); return;
-  }
-  if (target.dataset.color) {
-    $<HTMLInputElement>('[name="color"]', $('#profile-form')).value = target.dataset.color;
-    $$('[data-color]').forEach(b => { const selected = b.dataset.color === target.dataset.color; b.classList.toggle('selected', selected); b.setAttribute('aria-pressed', String(selected)); }); return;
   }
   if (target.dataset.favorite) {
     const memory = state.memories.find(m => m.id === target.dataset.favorite); if (!memory) return;
@@ -201,16 +192,10 @@ document.addEventListener('click', async event => {
   }
   switch (target.dataset.action) {
     case 'close': closeModal(); break;
-    case 'events': eventPicker(); break;
-    case 'join': if (state.loading) toast('接続を準備しています'); else if (state.demo) joinEvent(state.eventId); else eventPicker(); break;
-    case 'enter-live': joinEvent(state.eventId); break;
+    case 'join': if (state.loading) toast('接続を準備しています'); else if (state.demo) joinEvent(); break;
+    case 'enter-live': joinEvent(); break;
     case 'edit-profile': case 'register': profileForm(false); break;
     case 'about': about(); break;
-    case 'export': {
-      const data = state.memories.map(({ userId, person, ...m }) => ({ ...m, person: { name: person.name, artist: person.artist, song: person.song } }));
-      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-      const a = document.createElement('a'); a.href = url; a.download = 'feswave-memories.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); toast('メモリをダウンロードしました'); break;
-    }
   }
 });
 $('#tap-button').addEventListener('click', react); $('#orb').addEventListener('click', react);
