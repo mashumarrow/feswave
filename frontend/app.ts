@@ -317,49 +317,33 @@ async function react() {
 }
 function profileForm(joinAfter = false) {
   pendingJoin = joinAfter;
-  const user = state.user || {
-    name: "",
-    artist: "",
-    song: "",
-    color: "pink",
-    visible: false,
-  };
-  openModal(
-    `<div class="modal-inner">${closeButton}<div class="stepper"><span class="active">01 PROFILE</span><i></i><span>02 READY</span><i></i><span>03 LIVE</span></div><svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">LET'S FIND YOUR WAVE.</div><h2>${user.name ? "プロフィールを編集" : "「好き」で、つながろう。"}</h2><p class="modal-description">あなたの音楽を、少しだけ教えてください。<br>名前や連絡先の交換なしで、同じ気持ちを共有できます。</p><form id="profile-form"><label class="form-field"><span>ニックネーム <small>必須 · 20文字以内</small></span><input name="name" autocomplete="nickname" placeholder="例：haru" required maxlength="20" value="${escape(user.name)}"></label><div class="form-row"><label class="form-field"><span>好きなアーティスト</span><input name="artist" placeholder="例：YOASOBI" maxlength="60" value="${escape(user.artist)}"></label><label class="form-field"><span>好きな曲</span><input name="song" placeholder="例：群青" maxlength="60" value="${escape(user.song)}"></label></div><div class="form-field"><span>あなたのカラー</span><div class="color-selector">${colors.map((color) => `<button type="button" class="color-choice ${colorOf(user.color) === color ? "selected" : ""}" data-color="${color}" aria-label="${{ pink: "ピンク", blue: "ブルー", purple: "パープル", orange: "オレンジ" }[color]}" aria-pressed="${colorOf(user.color) === color}"><span class="avatar small ${color}">♪</span></button>`).join("")}</div><input type="hidden" name="color" value="${colorOf(user.color)}"></div><label class="consent"><input type="checkbox" name="visible" ${user.visible ? "checked" : ""}><span>公開プロフィールを共有し、共感メモリに残す<small>ニックネーム・好きな曲・アーティストを共有します。<br>オフでも、ニックネームとリアクションは参加中に表示されます。</small></span></label><div class="form-error" id="form-error" role="alert"></div><button class="primary-btn full-width" type="submit">${user.name ? "変更を保存する" : "プロフィールを登録する"} ${icon("arrow")}</button><p class="member-note">このブラウザのCookieでプロフィールを識別します。共有端末では利用にご注意ください。</p></form></div>`,
-  );
+  const user = state.user || { name: '', artist: '', song: '', color: 'pink', visible: false };
+  const editing = !!user.name;
+  openModal(`<form id="profile-form" class="editor-form">
+    <header class="editor-header"><button type="button" data-action="close" class="editor-cancel">キャンセル</button><h2>${editing ? 'プロフィール編集' : 'プロフィールを作成'}</h2><span class="editor-header-spacer" aria-hidden="true"></span></header>
+    <div class="editor-body">
+      <section class="editor-basics" aria-label="名前とアイコン"><div class="editor-preview"><span id="editor-avatar" class="avatar editor-avatar pink"></span><div><strong id="editor-preview-name">${escape(user.name || 'あなたの名前')}</strong><p id="editor-icon-caption">好きな曲のジャケットをアイコンに</p></div></div><label class="form-field"><span>ニックネーム <small>必須・20文字まで</small></span><input name="name" autocomplete="nickname" placeholder="ライブで呼ばれたい名前" required maxlength="20" value="${escape(user.name)}"></label></section>
+      <section class="editor-section" aria-label="好きな曲の編集"><div class="editor-section-heading"><h3>好きな曲とアイコン</h3><span>任意</span></div>${musicPickerMarkup()}<details id="manual-music" class="manual-music" ${editing && !state.user?.tracks?.length && !state.user?.music && (user.artist || user.song) ? 'open' : ''}><summary>検索せずに曲名を入力する</summary><p id="music-manual-note" class="music-manual-note"></p><label class="form-field"><span>アーティスト名</span><input name="artist" placeholder="例：YOASOBI" maxlength="60" value="${escape(editing ? user.artist : '')}"></label><label class="form-field"><span>曲名</span><input name="song" placeholder="例：群青" maxlength="60" value="${escape(editing ? user.song : '')}"></label></details></section>
+      <section class="editor-options" aria-label="公開設定"><label class="editor-sharing"><span class="sharing-copy"><strong>好きな曲とアイコンを公開</strong><small>オンにするとライブの参加者に表示され、共感した記録を残せます。</small></span><input class="sharing-input" type="checkbox" role="switch" name="visible" ${user.visible ? 'checked' : ''}><span class="sharing-toggle" aria-hidden="true"></span></label><input type="hidden" name="color" value="${colorOf(user.color)}"></section>
+    </div>
+    <footer class="editor-actions"><div class="form-error" id="form-error" role="alert"></div><p>保存するまで変更は反映されません</p><button class="primary-btn full-width" type="submit">${editing ? '変更を保存する' : joinAfter ? '登録して次へ' : 'プロフィールを登録'} ${icon('check')}</button></footer>
+  </form>`);
+  $<HTMLDialogElement>('#modal').classList.add('profile-editor-dialog');
+  musicPicker = new MusicPicker($<HTMLFormElement>('#profile-form'), state.user?.tracks?.length ? state.user.tracks : state.user?.music ? [state.user.music] : [], state.user?.favoriteTrackId ?? state.user?.music?.trackId ?? null, async (term, signal) => {
+    const result = await api(`music/search?term=${encodeURIComponent(term)}`, { signal }); return result.results;
+  });
 }
 async function saveProfile(form: HTMLFormElement) {
-  const button = $<HTMLButtonElement>('button[type="submit"]', form);
-  button.disabled = true;
+  const button = $<HTMLButtonElement>('button[type="submit"]', form); button.disabled = true;
   const buttonContent = button.innerHTML;
-  button.textContent = "保存しています…";
-  button.setAttribute("aria-busy", "true");
+  button.textContent = '保存しています…';
+  button.setAttribute('aria-busy', 'true');
   const fields = new FormData(form);
   try {
-    state.user = await api("profile", {
-      method: "PUT",
-      body: JSON.stringify({
-        name: fields.get("name"),
-        artist: fields.get("artist"),
-        song: fields.get("song"),
-        color: fields.get("color"),
-        visible: fields.get("visible") === "on",
-      }),
-    });
-    renderIdentity();
-    renderProfile();
-    if (pendingJoin) showReady();
-    else {
-      closeModal();
-      toast("プロフィールを保存しました");
-    }
-  } catch (e) {
-    $("#form-error").textContent =
-      e instanceof Error ? e.message : "保存できませんでした";
-    button.disabled = false;
-    button.innerHTML = buttonContent;
-    button.removeAttribute("aria-busy");
-  }
+    state.user = await api('profile', { method: 'PUT', body: JSON.stringify({ name: fields.get('name'), artist: fields.get('artist'), song: fields.get('song'), color: colorOf(state.user?.color), visible: fields.get('visible') === 'on', trackIds: musicPicker?.tracks.map(track => track.trackId) ?? [], favoriteTrackId: musicPicker?.favoriteTrackId ?? null }) });
+    renderIdentity(); renderProfile();
+    if (pendingJoin) showReady(); else { closeModal(); toast('プロフィールを保存しました'); }
+  } catch (e) { $('#form-error').textContent = e instanceof Error ? e.message : '保存できませんでした'; button.disabled = false; button.innerHTML = buttonContent; button.removeAttribute('aria-busy'); }
 }
 function showReady() {
   openModal(
