@@ -1,20 +1,31 @@
 # ESP32 2台のWi-Fi RSSIマッピング実験
 
-ESP32-WROOM-32D搭載開発ボード2台とWi-Fi対応スマホで、このスマホの信号が左右どちらの受信機で強いかを表示する。左のESP32がアクセスポイントとWebサーバーを兼ねる。外部ルーター、インターネット、スマホアプリは不要。2台とも基板アンテナを使う。
+左にESP32-WROOM-32D、右にUNO R4 WiFi内蔵のESP32-S3またはもう1台のWROOM-32Dを置き、Wi-Fi対応スマホで、このスマホの信号が左右どちらの受信機で強いかを表示する。左のESP32がアクセスポイントとWebサーバーを兼ねる。外部ルーター、インターネット、スマホアプリは不要。2台とも基板アンテナを使う。
 
 ## 書き込み
 
-USBシリアル付きの4 MB開発ボード（PlatformIOの `esp32dev`）を想定。モジュール単体の場合は3.3 V電源と書き込み回路が別途必要。
-
-PlatformIO IDEでこのディレクトリを開き、左用のボードには環境 `left`、右用には `right` の Upload を実行する。CLIの場合はこのディレクトリで次を実行する。1台ずつUSB接続するとポートを取り違えにくい。
+左のWROOM-32Dには `left` を書き込む。USBシリアル付きの4 MB開発ボードを想定する。CLIコマンドはこのディレクトリで実行し、ポート名は `pio device list` で確認する。
 
 ```sh
-pio run
-pio device list
 pio run -e left -t upload --upload-port /dev/ttyUSB0
-# ボードを右用に差し替え、ポート名を確認
-pio run -e right -t upload --upload-port /dev/ttyUSB0
 ```
+
+### 右にUNO R4 WiFiを使う場合
+
+`uno-r4-right` は内蔵のESP32-S3-MINI-1-N8（8 MB）を直接プログラムする。測定ファームを書き込むと、S3が担当する標準USBブリッジとWiFiS3用の通信機能は、公式ファームを復元するまで使えなくなる。[Arduino公式の復元手順](https://support.arduino.cc/hc/en-us/articles/16379769332892-Restore-the-USB-connectivity-firmware-on-UNO-R4-WiFi-with-espflash)
+
+1. UNOの電源とUSBを外す。USB-C近くの6ピンESPヘッダーで、4番 `DOWNLOAD`（GPIO0）と6番 `GND` をジャンパーで短絡し、その状態でUSBを接続する。認識後にジャンパーを外す。[公式ピン配置図](https://docs.arduino.cc/resources/pinouts/ABX00087-full-pinout.pdf)
+2. `pio device list` で Espressif USB JTAG/serial（VID:PID `303A:1001`）のポート名を確認し、次を実行する。
+
+   ```sh
+   pio run -e uno-r4-right -t upload --upload-port /dev/ttyACM0
+   ```
+
+3. 書き込み完了後、ジャンパーが外れていることを確認してUSBをつなぎ直す。左を起動し、スマホの測定画面で「右受信機 接続中」と左右のRSSIを確認する。機種が違うため、設置後に中央の補正を取り直す。
+
+### 右にもWROOM-32Dを使う場合
+
+右用ボードを接続し、`pio run -e right -t upload --upload-port /dev/ttyUSB0` を実行する。
 
 ## 試し方
 
