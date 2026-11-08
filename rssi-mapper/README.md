@@ -59,3 +59,5 @@ USBデバッグを許可したAndroid端末でChromeの測定画面を開き、P
 5 mの基線上に0.5 m間隔の目印を置き、USBデバッグ接続したスマホで測定ページを開く。`node tools/distance-trial.mjs > /tmp/rssi-distance.jsonl` を起動すると、画面に次の距離と到着ボタンが出る。指定位置で押して6秒静止し、最初の1秒を除く左右RSSIを取得する。各地点は往復1回ずつ。右端ではいったん離れてから戻る。画面を再読み込みすると試験状態は消える。各地点が終わるごとにログをPCへ保存する。
 
 `python3 tools/score-distance.py /tmp/rssi-distance.jsonl` は往路の地点別RSSI差中央値に最も近い地点を復路の中央値から選び、2.5 m・1 m・0.5 m間隔で集計する。各間隔ではその格子上の地点のみを評価する。同点は正解に含めず、誤差は同点候補の最大値を採用する。結果は静止区間の再識別で、歩行中の瞬間位置精度は別途評価する。
+
+4 m区間では `node tools/distance-trial.mjs --4m > /tmp/rssi-4m.jsonl` を使う。1 m刻みの5地点を往路・復路・往路の3回測り、`python3 tools/score-distance.py /tmp/rssi-4m.jsonl --4m` で評価する。各地点の最初の2回の中央値を平均して校正値とし、3回目を検証用にする。

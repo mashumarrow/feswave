@@ -3,11 +3,14 @@ import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 
-function installTrial() {
+function installTrial(fourMeters) {
   if (window.rssiDistanceTrial) return;
   if (typeof updateMeasurement !== 'function') throw Error('測定ページを再読み込みしてください');
-  const points = Array.from({length:11}, (_, i) => i / 2);
-  const stops = [...points, ...points.slice().reverse()];
+  const points = fourMeters ? [0,1,2,3,4] : Array.from({length:11}, (_, i) => i / 2);
+  const names = fourMeters ? ["校正1","校正2","検証"] : ["往路","復路"];
+  const passes = ["out","back","test"];
+  const pass = () => Math.floor(index / points.length);
+  const stops = [...points, ...points.slice().reverse(), ...(fourMeters ? points : [])];
   const panel = document.createElement('section');
   panel.innerHTML = '<b></b><p></p><button>到着・測定開始</button>';
   document.querySelector('h1').after(panel);
@@ -17,8 +20,8 @@ function installTrial() {
   const state = window.rssiDistanceTrial = {rows:[], done:false};
   let index=0, start=null, valid=0;
   function next() {
-    title.textContent = index===stops.length ? '往復測定完了' :
-      (index<11?'往路':'復路')+' · 左から '+stops[index].toFixed(1)+' m';
+    title.textContent = index===stops.length ? '測定完了' :
+      names[pass()]+' · 左から '+stops[index].toFixed(1)+' m';
     button.disabled=index===stops.length;
     state.done=button.disabled;
   }
@@ -31,18 +34,18 @@ function installTrial() {
     if(start===null)return;
     const elapsed=performance.now()-start;
     if(elapsed>=1000 && elapsed<=6000) {
-      state.rows.push({time:Date.now(),pass:index<11?'out':'back',m:stops[index],
+      state.rows.push({time:Date.now(),pass:passes[pass()],m:stops[index],
         left:data.left??null,right:data.right??null,online:data.online===true});
       if(data.online && Number.isFinite(data.left) && Number.isFinite(data.right))valid++;
     }
     if(elapsed<6000)return;
     start=null;button.disabled=false;
     if(valid<5) {
-      state.rows=state.rows.filter(r=>!(r.m===stops[index] && r.pass===(index<11?'out':'back')));
+      state.rows=state.rows.filter(r=>!(r.m===stops[index] && r.pass===(passes[pass()])));
       status.textContent='受信不足です。同じ地点でもう一度押してください';return;
     }
     index++;next();
-    status.textContent=state.done?'記録しました':index===11?'一歩離れて同じ右端に戻り、復路を開始':'記録しました。次の地点へ移動';
+    status.textContent=state.done?'記録しました':index%points.length===0?'一歩離れて同じ印に戻り、次の周回を開始':'記録しました。次の地点へ移動';
   };
   next();
 }
@@ -64,7 +67,16 @@ async function evaluate(expression){
   if(response.error||response.result?.exceptionDetails)throw Error(JSON.stringify(response));
   return response.result.result.value;
 }
-await evaluate('('+installTrial.toString()+')()');
+const fourMeters = process.argv[2] === '--4m';
+if (await evaluate('Boolean(window.rssiDistanceTrial?.done)')) {
+  await evaluate('setTimeout(()=>location.reload(), 30)');
+  await delay(500);
+  for (let i=0;i<20;i++) {
+    if (await evaluate("typeof updateMeasurement==='function' && !window.rssiDistanceTrial")) break;
+    await delay(250);
+  }
+}
+await evaluate('('+installTrial.toString()+')('+fourMeters+')');
 let count=0;
 for(;;){
   // Emit completed stops only, so a retry never duplicates a partial stop.
