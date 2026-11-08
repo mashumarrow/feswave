@@ -6,7 +6,16 @@
 
 ## 起動
 
-Node.js 20以上とRust stableが必要です。WindowsではMSVCビルドツールも必要です。
+Git、Node.js 20以上、Rust stable（Cargoを含む）が必要です。WindowsではMSVCビルドツールも必要です。
+
+リポジトリをクローンして、プロジェクトのディレクトリへ移動します。
+
+```sh
+git clone https://github.com/mashumarrow/feswave.git
+cd feswave
+```
+
+依存パッケージをインストールして起動します。
 
 ```sh
 npm install
@@ -15,7 +24,7 @@ npm start
 
 **http://localhost:3000** を開きます。TypeScriptをコンパイルした後、Rustサーバーを起動します。初回はCargoの依存取得とビルドに時間がかかります。
 
-この作業環境には `.tools/` にRustを導入済みです。起動スクリプトはプロジェクト内のRustを優先し、なければ通常の `cargo` を利用します。`.tools/` はGit管理対象外です。
+起動スクリプトはプロジェクト内の `.tools/` にRustがあれば優先し、なければ通常の `cargo` を利用します。`.tools/` はGit管理対象外なので、クローンした環境ではRustを別途インストールしてください。
 
 ## スマホから接続
 
