@@ -28,7 +28,7 @@ impl Store {
         sqlx::migrate!().run(&self.pool).await
     }
     pub async fn users(&self) -> Result<HashMap<String, User>, sqlx::Error> {
-        let users = sqlx::query_as::<_, User>("SELECT u.id::text AS id,u.name,u.artist,u.song,u.color,u.visible,u.event_id,u.music_track AS music FROM users u")
+        let users = sqlx::query_as::<_, User>("SELECT u.id::text AS id,u.name,u.artist,u.song,u.color,u.visible,u.event_id,u.music_track AS music,u.tracks,u.favorite_track_id FROM user_profiles u")
             .fetch_all(&self.pool)
             .await?;
         Ok(users.into_iter().map(|u| (u.id.clone(), u)).collect())
@@ -44,7 +44,7 @@ impl Store {
         })).collect()))
     }
     pub async fn session_user(&self, token: &str) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as::<_, User>("SELECT u.id::text AS id,u.name,u.artist,u.song,u.color,u.visible,u.event_id,u.music_track AS music FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW()")
+        sqlx::query_as::<_, User>("SELECT u.id::text AS id,u.name,u.artist,u.song,u.color,u.visible,u.event_id,u.music_track AS music,u.tracks,u.favorite_track_id FROM user_profiles u JOIN sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW()")
             .bind(token_hash(token)).fetch_optional(&self.pool).await
     }
     pub async fn create_session(&self, user: &User, token: &str) -> Result<(), sqlx::Error> {
@@ -69,8 +69,16 @@ impl Store {
     }
     pub async fn update_profile(&self, user: &User) -> Result<(), sqlx::Error> {
         let mut tx = self.pool.begin().await?;
-        sqlx::query("UPDATE users SET name=$2,artist=$3,song=$4,color=$5,visible=$6,music_track=$7,updated_at=NOW() WHERE id=$1::uuid")
-            .bind(&user.id).bind(&user.name).bind(&user.artist).bind(&user.song).bind(&user.color).bind(user.visible).bind(&user.music).execute(&mut *tx).await?;
+        sqlx::query("UPDATE users SET name=$2,artist=$3,song=$4,color=$5,visible=$6,music_track=$7,favorite_track_id=$8,updated_at=NOW() WHERE id=$1::uuid")
+            .bind(&user.id).bind(&user.name).bind(&user.artist).bind(&user.song).bind(&user.color).bind(user.visible).bind(&user.music).bind(user.favorite_track_id).execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM user_tracks WHERE user_id=$1::uuid")
+            .bind(&user.id)
+            .execute(&mut *tx)
+            .await?;
+        for (position, track) in user.tracks.iter().enumerate() {
+            sqlx::query("INSERT INTO user_tracks(user_id,track_id,track,position) VALUES($1::uuid,$2,$3,$4)")
+                .bind(&user.id).bind(track.track_id).bind(sqlx::types::Json(track)).bind(position as i16).execute(&mut *tx).await?;
+        }
         if !user.visible {
             sqlx::query("DELETE FROM memories WHERE person_id=$1::uuid")
                 .bind(&user.id)
@@ -113,7 +121,7 @@ impl Store {
         tx.commit().await
     }
     pub async fn memories(&self, uid: &str) -> Result<Vec<Memory>, sqlx::Error> {
-        let rows = sqlx::query("SELECT m.id::text AS id,m.user_id::text AS user_id,m.event_id,(EXTRACT(EPOCH FROM m.occurred_at)*1000)::bigint AS at_ms,m.level,m.favorite,u.id::text AS person_id,u.name,u.artist,u.song,u.color,u.music_track AS music FROM memories m JOIN users u ON u.id=m.person_id WHERE m.user_id=$1::uuid AND u.visible ORDER BY m.occurred_at DESC,m.id")
+        let rows = sqlx::query("SELECT m.id::text AS id,m.user_id::text AS user_id,m.event_id,(EXTRACT(EPOCH FROM m.occurred_at)*1000)::bigint AS at_ms,m.level,m.favorite,u.id::text AS person_id,u.name,u.artist,u.song,u.color,u.music_track AS music,u.tracks FROM memories m JOIN user_profiles u ON u.id=m.person_id WHERE m.user_id=$1::uuid AND u.visible ORDER BY m.occurred_at DESC,m.id")
             .bind(uid).fetch_all(&self.pool).await?;
         Ok(rows
             .iter()
@@ -131,6 +139,7 @@ impl Store {
                     song: r.get("song"),
                     color: r.get("color"),
                     music: r.get("music"),
+                    tracks: r.get("tracks"),
                 },
             })
             .collect())
