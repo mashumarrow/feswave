@@ -1,10 +1,12 @@
+mod music;
 mod reactions;
 mod storage;
+use music::{MusicService, MusicTrack};
 use storage::Store;
 
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, Path, Request, State},
+    extract::{DefaultBodyLimit, Path, Query, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{
@@ -51,6 +53,12 @@ struct User {
     color: String,
     visible: bool,
     event_id: Option<String>,
+    #[serde(default)]
+    music: Option<sqlx::types::Json<MusicTrack>>,
+    #[serde(default)]
+    tracks: sqlx::types::Json<Vec<MusicTrack>>,
+    #[serde(default)]
+    favorite_track_id: Option<i64>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -60,6 +68,10 @@ struct PublicUser {
     artist: String,
     song: String,
     color: String,
+    #[serde(default)]
+    music: Option<sqlx::types::Json<MusicTrack>>,
+    #[serde(default)]
+    tracks: sqlx::types::Json<Vec<MusicTrack>>,
 }
 
 impl User {
@@ -68,6 +80,16 @@ impl User {
             id: self.id.clone(),
             name: self.name.clone(),
             color: self.color.clone(),
+            tracks: if self.visible {
+                self.tracks.clone()
+            } else {
+                sqlx::types::Json(vec![])
+            },
+            music: if self.visible {
+                self.music.clone()
+            } else {
+                None
+            },
             artist: if self.visible {
                 self.artist.clone()
             } else {
@@ -111,6 +133,7 @@ struct App {
     store: Store,
     events: Value,
     public_dir: PathBuf,
+    music: MusicService,
 }
 
 type Shared = Arc<App>;
@@ -186,6 +209,9 @@ async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Res
                 color: "pink".into(),
                 visible: false,
                 event_id: None,
+                music: None,
+                tracks: sqlx::types::Json(vec![]),
+                favorite_track_id: None,
             };
 
             let token = id();
@@ -215,6 +241,7 @@ async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Res
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ProfileInput {
     name: String,
     #[serde(default)]
@@ -225,6 +252,12 @@ struct ProfileInput {
     color: String,
     #[serde(default)]
     visible: bool,
+    #[serde(default)]
+    track_id: Option<i64>,
+    #[serde(default)]
+    track_ids: Option<Vec<i64>>,
+    #[serde(default)]
+    favorite_track_id: Option<i64>,
 }
 
 async fn profile(
@@ -232,17 +265,52 @@ async fn profile(
     headers: HeaderMap,
     Json(input): Json<ProfileInput>,
 ) -> ApiResult<Json<User>> {
-    let mut inner = app.inner.lock().await;
-    let mut user = authenticated(&headers, &app.store).await?;
-
+    let previous = authenticated(&headers, &app.store).await?;
     let name = clean(&input.name, 20);
     if name.is_empty() {
         return Err(bad("ニックネームを入力してください"));
     }
-
+    // Accept the old one-song request as well as the new collection request.
+    let (track_ids, favorite_id) = match input.track_ids {
+        Some(ids) => (ids, input.favorite_track_id),
+        None => (input.track_id.into_iter().collect(), input.track_id),
+    };
+    validate_tracks(&track_ids, favorite_id)?;
+    // Catalog requests happen outside the live-state lock so a slow search never blocks reactions.
+    let mut tracks = Vec::new();
+    for track_id in track_ids {
+        let existing = previous
+            .tracks
+            .iter()
+            .find(|track| track.track_id == track_id)
+            .or_else(|| {
+                previous
+                    .music
+                    .as_ref()
+                    .map(|track| &track.0)
+                    .filter(|track| track.track_id == track_id)
+            });
+        tracks.push(if let Some(track) = existing {
+            track.clone()
+        } else {
+            app.music.lookup(track_id).await?
+        });
+    }
+    let music = favorite_id
+        .and_then(|id| tracks.iter().find(|track| track.track_id == id).cloned())
+        .map(sqlx::types::Json);
+    let mut inner = app.inner.lock().await;
+    let mut user = authenticated(&headers, &app.store).await?;
     user.name = name;
     user.artist = clean(&input.artist, 60);
     user.song = clean(&input.song, 60);
+    if let Some(track) = &music {
+        user.artist = clean(&track.artist_name, 60);
+        user.song = clean(&track.track_name, 60);
+    }
+    user.music = music;
+    user.tracks = sqlx::types::Json(tracks);
+    user.favorite_track_id = favorite_id;
     user.color = if ["pink", "blue", "purple", "orange"].contains(&input.color.as_str()) {
         input.color
     } else {
@@ -255,6 +323,58 @@ async fn profile(
     app.notify();
 
     Ok(Json(user))
+}
+
+fn validate_tracks(ids: &[i64], favorite: Option<i64>) -> ApiResult<()> {
+    if ids.len() > 20 {
+        return Err(bad("好きな曲は20曲まで登録できます"));
+    }
+    let unique: HashSet<_> = ids.iter().collect();
+    if unique.len() != ids.len() || ids.iter().any(|id| *id <= 0) {
+        return Err(bad("曲が重複しているか、曲IDが正しくありません"));
+    }
+    if ids.is_empty() && favorite.is_some()
+        || !ids.is_empty() && !favorite.is_some_and(|id| ids.contains(&id))
+    {
+        return Err(bad("登録した曲の中から一番のお気に入りを1曲選んでください"));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+    #[test]
+    fn favorite_must_belong_to_a_unique_collection() {
+        assert!(validate_tracks(&[], None).is_ok());
+        assert!(validate_tracks(&[1, 2], Some(2)).is_ok());
+        for (ids, primary) in [
+            (vec![1, 1], Some(1)),
+            (vec![1, 2], Some(3)),
+            (vec![1], None),
+            (vec![], Some(1)),
+            (vec![-1], Some(-1)),
+        ] {
+            assert!(validate_tracks(&ids, primary).is_err());
+        }
+        assert!(validate_tracks(&(1..=20).collect::<Vec<_>>(), Some(1)).is_ok());
+        assert!(validate_tracks(&(1..=21).collect::<Vec<_>>(), Some(1)).is_err());
+    }
+}
+
+#[derive(Deserialize)]
+struct MusicQuery {
+    term: String,
+}
+async fn search_music(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Query(query): Query<MusicQuery>,
+) -> ApiResult<Json<Value>> {
+    authenticated(&headers, &app.store).await?;
+    Ok(Json(
+        json!({"results":app.music.search(&query.term).await?}),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -561,6 +681,9 @@ async fn static_file(State(app): State<Shared>, req: Request) -> Response {
     let (file, content_type) = match req.uri().path() {
         "/" => ("index.html", "text/html; charset=utf-8"),
         "/app.js" => ("app.js", "text/javascript; charset=utf-8"),
+        "/music.js" => ("music.js", "text/javascript; charset=utf-8"),
+        "/music.css" => ("music.css", "text/css; charset=utf-8"),
+        "/itunes-badge.svg" => ("itunes-badge.svg", "image/svg+xml"),
         "/styles.css" => ("styles.css", "text/css; charset=utf-8"),
         "/app-shell.css" => ("app-shell.css", "text/css; charset=utf-8"),
         "/favicon.svg" => ("favicon.svg", "image/svg+xml"),
@@ -598,7 +721,7 @@ async fn security(req: Request, next: Next) -> Response {
         ("referrer-policy", "same-origin"),
         (
             "content-security-policy",
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.mzstatic.com; connect-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'",
         ),
     ] {
         response.headers_mut().insert(
@@ -649,6 +772,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         store,
         events,
         public_dir: root.join("public"),
+        music: MusicService::new()?,
     });
 
     let ticker = app.clone();
@@ -669,6 +793,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let router = Router::new()
         .route("/api/session", get(session))
         .route("/api/profile", put(profile))
+        .route("/api/music/search", get(search_music))
         .route("/api/join", post(join_event))
         .route("/api/react", post(react))
         .route("/api/stream", get(stream))
