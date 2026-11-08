@@ -15,7 +15,10 @@ small{display:block;margin:10px 0;color:#405951}</style><main><h1>RSSI 測位テ
 <div class="track"><span id="marker" hidden></span></div><strong id="zone">測定待ち</strong>
 <small>このスマホの信号を比較しています。目盛りは左右の傾向を示します。</small></section>
 <button id="cal" disabled>ここを中央として補正</button> <button id="reset" hidden>補正を解除</button>
-<small id="offset"></small></main><script>
+<small id="offset"></small><section><h2>位置を記録</h2>
+<p>実際に立っている位置を押し、12秒間その場でスマホを持ってください。</p>
+<button data-place="L">左</button> <button data-place="C">中央</button> <button data-place="R">右</button>
+<small id="trial" role="status">記録待ち</small></section></main><script>
 const el=id=>document.getElementById(id);
 let bias=0, delta=null;
 function showBias(){
@@ -39,11 +42,28 @@ function render(data){
 let latest={};
 el('cal').onclick=()=>{if(delta!==null){bias=delta;showBias();render(latest)}};
 el('reset').onclick=()=>{bias=0;showBias();render(latest)};
+const session=crypto.getRandomValues(new Uint32Array(1))[0].toString(16);
+let place='', trial=0, until=0, received=0;
+const placeButtons=[...document.querySelectorAll('[data-place]')];
+function setTrialControls(active){for(const b of placeButtons)b.disabled=active}
+for(const b of placeButtons)b.onclick=()=>{
+  place=b.dataset.place;trial++;received=0;until=performance.now()+12000;
+  setTrialControls(true);el('trial').textContent=b.textContent+'で記録中…';
+};
 async function poll(){
+  if(place && performance.now()>=until){
+    place='';setTrialControls(false);
+    el('trial').textContent='記録終了 · 左右がそろった回数 '+received+' 回';
+  }
+  const label=place;
+  const params=new URLSearchParams();
+  if(label){params.set('place',label);params.set('session',session);params.set('trial',trial);params.set('bias',bias.toFixed(2))}
+
   try{
-    const response=await fetch('/api/me',{cache:'no-store',signal:AbortSignal.timeout(3000)});
+    const response=await fetch('/api/me'+(label?'?'+params:''),{cache:'no-store',signal:AbortSignal.timeout(3000)});
     if(!response.ok)throw Error();
     latest=await response.json();render(latest);
+    if(label && delta!==null)received++;
   }catch{latest={};render(latest);el('status').textContent='左受信機と通信できません。Wi-Fi接続を確認してください。'}
   setTimeout(poll,500);
 }

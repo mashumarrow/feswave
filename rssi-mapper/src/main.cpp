@@ -149,6 +149,12 @@ void sendMeasurement() {
   String json = "{\"left\":" + freshValue(snapshot, mac, now) +
                 ",\"right\":" + freshValue(right, mac, now) +
                 ",\"online\":" + (heardRight && now - lastReport < freshMs ? "true}" : "false}");
+  const String place = web.arg("place");
+  if (place == "L" || place == "C" || place == "R") {
+    const unsigned long session = strtoul(web.arg("session").c_str(), nullptr, 16);
+    Serial.printf("SAMPLE,%lu,%lx,%ld,%s,%.2f,%s\n", (unsigned long)now, session,
+                  web.arg("trial").toInt(), place.c_str(), web.arg("bias").toFloat(), json.c_str());
+  }
   web.send(200, "application/json", json);
 }
 #else
