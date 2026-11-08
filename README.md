@@ -81,7 +81,7 @@ PCの通常ウィンドウとシークレットウィンドウで、独立した
 
 最初の1曲は自動で一番のお気に入りになります。同じ曲は重複追加できません。各曲の「×」で削除できます。アイコンに使っている曲を削除した場合は残った先頭の曲を一番にし、全部削除すると文字アイコンへ戻ります。画面下に常に表示する「変更を保存する」で、追加・削除・アイコンの変更を確定します。「キャンセル」で閉じると変更は保存しません。
 
-アーティスト・曲名はアイコンに選んだ曲から自動で登録します。検索を利用しない場合は「検索せずに曲名を入力する」を開いて手入力できます。登録した曲はプロフィールの「FAVORITE TRACKS」に一覧で表示し、作品紹介カードにiTunes Storeへのリンクを付けています。
+アーティスト・曲名はアイコンに選んだ曲から自動で登録します。検索を利用しない場合は「検索せずに曲名を入力する」を開いて手入力できます。「文字アイコンの色」も開いて変更できます。登録した曲はプロフィールの「FAVORITE TRACKS」に一覧で表示し、作品紹介カードにiTunes Storeへのリンクを付けています。
 
 Rustサーバーが日本のiTunes Search APIへ接続します。追加のAPIキー設定は不要です。音源の再生・ダウンロードは行いません。画像が取得できない場合は音符の代替表示になります。ネットワーク障害や該当曲がない場合も手入力で登録できます。
 
@@ -93,20 +93,20 @@ Rustサーバーが日本のiTunes Search APIへ接続します。追加のAPI�
 
 作品紹介カードには公式バッジ付きリンクを表示します。[AppleのAPI仕様・提供条件](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html) と [iTunes Storeの表示ガイドライン](https://marketing.services.apple/itunes-identity-guidelines) を参照しています。公式バッジは同ガイドラインの日本語素材をそのまま使用しています。
 
-Bluetooth、Spotify、位置・方向推定、アカウント認証は未実装です。イベント、出演者、会場はサンプルで、音源再生・曲認識は行いません。バブル配置は会場内の位置を示しません。
+Bluetooth、Spotify、位置・方向推定、アカウント認証は未実装です。イベント、出演者、会場、曲表示はサンプルで、音源再生・曲認識は行いません。バブル配置は会場内の位置を示しません。
 
 ## コマンド
 
-| コマンド | 内容 |
-| --- | --- |
-| `npm start` / `npm run dev` | TypeScriptをビルドしてRustサーバーを起動 |
-| `npm run build` | TypeScript → public/app.js |
-| `npm run typecheck` | strictモードで型チェック |
-| `npm run build:server` | Rustをビルド |
-| `npm run db:up` / `npm run db:down` | DockerのDBを起動 / 停止（データは保持） |
-| `npm run db:local` / `npm run db:local:stop` | 専用ローカルDBを作成・起動 / 停止 |
-| `npm run db:import -- .data/store.json` | 旧JSONをDBへ取り込み |
-| `npm test` | 型チェック、Rust単体テスト、実PostgreSQLでのHTTP/SSE統合テスト |
+| コマンド                                     | 内容                                                           |
+| -------------------------------------------- | -------------------------------------------------------------- |
+| `npm start` / `npm run dev`                  | TypeScriptをビルドしてRustサーバーを起動                       |
+| `npm run build`                              | TypeScript → public/app.js                                     |
+| `npm run typecheck`                          | strictモードで型チェック                                       |
+| `npm run build:server`                       | Rustをビルド                                                   |
+| `npm run db:up` / `npm run db:down`          | DockerのDBを起動 / 停止（データは保持）                        |
+| `npm run db:local` / `npm run db:local:stop` | 専用ローカルDBを作成・起動 / 停止                              |
+| `npm run db:import -- .data/store.json`      | 旧JSONをDBへ取り込み                                           |
+| `npm test`                                   | 型チェック、Rust単体テスト、実PostgreSQLでのHTTP/SSE統合テスト |
 
 自動リロードは未実装です。フロントエンド変更後は `npm run build` とブラウザ再読み込み、Rust変更後はサーバー再起動が必要です。
 
