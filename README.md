@@ -74,6 +74,18 @@ npm start
 
 PCの通常ウィンドウとシークレットウィンドウで、独立した2ユーザーを試せます。同じブラウザのタブは同一ユーザーです。
 
+## iTunesの曲・ジャケットをプロフィールに登録
+
+プロフィールの作成・編集で「ジャケット付きで好きな曲を登録」から、曲名・アーティスト名・アルバム名を入力して検索できます。曲を選ぶとアーティストと曲名を入力し、登録後の「FAVORITE TRACK」にアルバム名・ジャケット・iTunes Storeへのリンクを表示します。検索は任意で、従来の手入力も使えます。手入力に変更すると選択済みジャケットは解除されます。
+
+Rustサーバーが日本のiTunes Search APIへ接続します。追加のAPIキー設定は不要です。音源の再生・ダウンロードは行いません。画像が取得できない場合は音符の代替表示になります。ネットワーク障害や該当曲がない場合も手入力で登録できます。
+
+選んだ曲は `users.music_track`（JSONB）に、曲ID・曲名・アーティスト・アルバム名・画像URL・ストアURLを保存します。画像ファイル自体はサーバーへ保存しません。サーバーは曲IDから公式情報を確認するため、ブラウザから任意の画像URLを登録することはできません。共有をオフにすると、相手に曲の詳細やジャケットは表示しません。
+
+検索結果・曲情報はサーバー内で15分キャッシュし、外部APIへの新しいリクエストは最短3.1秒間隔に制限します。保存済みの同じ曲でニックネーム等だけを変更する場合は、外部APIへ接続せず保存できます。
+
+ジャケットは好きな作品の紹介カードで、作品への公式バッジ付きリンクとともに表示します。アバターには使用しません。[AppleのAPI仕様・提供条件](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html) と [iTunes Storeの表示ガイドライン](https://marketing.services.apple/itunes-identity-guidelines) を参照しています。公式バッジは同ガイドラインの日本語素材をそのまま使用しています。
+
 Bluetooth、Spotify、位置・方向推定、アカウント認証は未実装です。イベント、出演者、会場、曲表示はサンプルで、音源再生・曲認識は行いません。バブル配置は会場内の位置を示しません。
 
 ## コマンド
@@ -114,9 +126,11 @@ npm start
 
 - `frontend/app.ts` — UI、イベント処理、型付きAPI呼び出し
 - `frontend/types.ts` — API、ユーザー、リアクション等の型
+- `frontend/music.ts` — 曲検索・選択UI、ジャケットカード、画像取得失敗時の表示
 - `src/main.rs` — Rust API、SSE、Cookie、永続化、静的ファイル配信
 - `src/storage.rs` — SQLxによるPostgreSQL操作、トランザクション、旧JSON取り込み
 - `src/reactions.rs` — 強度算出、共感判定、単体テスト
+- `src/music.rs` — iTunes Search/Lookup接続、キャッシュ、応答の検証
 - `migrations/` — テーブル定義とサンプルイベント
 - `compose.yaml` / `.env.example` — 開発用DBと環境設定
 - `public/` — HTML、CSS、コンパイル済みJavaScript

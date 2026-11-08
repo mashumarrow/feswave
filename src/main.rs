@@ -1,10 +1,12 @@
+mod music;
 mod reactions;
 mod storage;
+use music::{MusicService, MusicTrack};
 use storage::Store;
 
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, Path, Request, State},
+    extract::{DefaultBodyLimit, Path, Query, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{
@@ -49,6 +51,8 @@ struct User {
     color: String,
     visible: bool,
     event_id: Option<String>,
+    #[serde(default)]
+    music: Option<sqlx::types::Json<MusicTrack>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -58,6 +62,8 @@ struct PublicUser {
     artist: String,
     song: String,
     color: String,
+    #[serde(default)]
+    music: Option<sqlx::types::Json<MusicTrack>>,
 }
 impl User {
     fn public(&self) -> PublicUser {
@@ -65,6 +71,11 @@ impl User {
             id: self.id.clone(),
             name: self.name.clone(),
             color: self.color.clone(),
+            music: if self.visible {
+                self.music.clone()
+            } else {
+                None
+            },
             artist: if self.visible {
                 self.artist.clone()
             } else {
@@ -106,6 +117,7 @@ struct App {
     store: Store,
     events: Value,
     public_dir: PathBuf,
+    music: MusicService,
 }
 type Shared = Arc<App>;
 
@@ -172,6 +184,7 @@ async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Res
                 color: "pink".into(),
                 visible: false,
                 event_id: None,
+                music: None,
             };
             let token = id();
             app.store.create_session(&user, &token).await?;
@@ -195,6 +208,7 @@ async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Res
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ProfileInput {
     name: String,
     #[serde(default)]
@@ -205,12 +219,26 @@ struct ProfileInput {
     color: String,
     #[serde(default)]
     visible: bool,
+    #[serde(default)]
+    track_id: Option<i64>,
 }
 async fn profile(
     State(app): State<Shared>,
     headers: HeaderMap,
     Json(input): Json<ProfileInput>,
 ) -> ApiResult<Json<User>> {
+    let previous = authenticated(&headers, &app.store).await?;
+    // Catalog requests happen outside the live-state lock so a slow search never blocks reactions.
+    let music = match input.track_id {
+        Some(track_id) => {
+            if let Some(track) = previous.music.filter(|track| track.track_id == track_id) {
+                Some(track)
+            } else {
+                Some(sqlx::types::Json(app.music.lookup(track_id).await?))
+            }
+        }
+        None => None,
+    };
     let mut inner = app.inner.lock().await;
     let mut user = authenticated(&headers, &app.store).await?;
     let name = clean(&input.name, 20);
@@ -220,6 +248,11 @@ async fn profile(
     user.name = name;
     user.artist = clean(&input.artist, 60);
     user.song = clean(&input.song, 60);
+    if let Some(track) = &music {
+        user.artist = clean(&track.artist_name, 60);
+        user.song = clean(&track.track_name, 60);
+    }
+    user.music = music;
     user.color = if ["pink", "blue", "purple", "orange"].contains(&input.color.as_str()) {
         input.color
     } else {
@@ -230,6 +263,21 @@ async fn profile(
     inner.users.insert(user.id.clone(), user.clone());
     app.notify();
     Ok(Json(user))
+}
+
+#[derive(Deserialize)]
+struct MusicQuery {
+    term: String,
+}
+async fn search_music(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Query(query): Query<MusicQuery>,
+) -> ApiResult<Json<Value>> {
+    authenticated(&headers, &app.store).await?;
+    Ok(Json(
+        json!({"results":app.music.search(&query.term).await?}),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -465,6 +513,9 @@ async fn static_file(State(app): State<Shared>, req: Request) -> Response {
     let (file, content_type) = match req.uri().path() {
         "/" => ("index.html", "text/html; charset=utf-8"),
         "/app.js" => ("app.js", "text/javascript; charset=utf-8"),
+        "/music.js" => ("music.js", "text/javascript; charset=utf-8"),
+        "/music.css" => ("music.css", "text/css; charset=utf-8"),
+        "/itunes-badge.svg" => ("itunes-badge.svg", "image/svg+xml"),
         "/styles.css" => ("styles.css", "text/css; charset=utf-8"),
         "/app-shell.css" => ("app-shell.css", "text/css; charset=utf-8"),
         "/favicon.svg" => ("favicon.svg", "image/svg+xml"),
@@ -498,7 +549,7 @@ async fn security(req: Request, next: Next) -> Response {
         ("referrer-policy", "same-origin"),
         (
             "content-security-policy",
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.mzstatic.com; connect-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'",
         ),
     ] {
         response.headers_mut().insert(
@@ -541,6 +592,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         store,
         events,
         public_dir: root.join("public"),
+        music: MusicService::new()?,
     });
     let ticker = app.clone();
     tokio::spawn(async move {
@@ -556,6 +608,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let router = Router::new()
         .route("/api/session", get(session))
         .route("/api/profile", put(profile))
+        .route("/api/music/search", get(search_music))
         .route("/api/join", post(join_event))
         .route("/api/react", post(react))
         .route("/api/stream", get(stream))

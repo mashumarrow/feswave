@@ -65,12 +65,23 @@ test('PostgreSQL migration, import, real-time sharing, restart persistence and p
     const a = await request('session'); const b = await request('session');
     const cookieA = a.response.headers.get('set-cookie').split(';')[0];
     const cookieB = b.response.headers.get('set-cookie').split(';')[0];
+    assert.equal((await request('music/search?term=')).response.status, 401);
+    assert.deepEqual((await request('music/search?term=', cookieA)).data.results, []);
+    assert.equal((await request(`music/search?term=${'a'.repeat(101)}`, cookieA)).response.status, 400);
+    assert.equal((await request('profile', cookieA, 'PUT', { name: 'Alice', trackId: 0 })).response.status, 400);
     assert.notEqual(cookieA, cookieB);
     assert.equal(a.data.user.visible, false);
     assert.equal((await request('memories', `feswave=${a.data.user.id}`)).response.status, 401);
     for (const [cookie, name] of [[cookieA, 'Alice'], [cookieB, 'Bob']]) {
       assert.equal((await request('profile', cookie, 'PUT', { name, artist: 'YOASOBI', song: '群青', color: 'pink', visible: true })).response.status, 200);
       assert.equal((await request('join', cookie, 'POST', { eventId: 'feswave-2026' })).response.status, 200);
+    }
+    const music = { trackId:123,artistName:'Catalog Artist',trackName:'Catalog Track',collectionName:'Catalog Album',artworkUrl:'https://is1-ssl.mzstatic.com/image/cover.jpg',trackUrl:'https://music.apple.com/jp/album/123?app=itunes' };
+    for (const [cookie, user] of [[cookieA,a.data.user],[cookieB,b.data.user]]) {
+      await db.admin.query('UPDATE users SET music_track=$2 WHERE id=$1',[user.id,JSON.stringify(music)]);
+      const saved = await request('profile',cookie,'PUT',{name:user.id===a.data.user.id?'Alice':'Bob',artist:'untrusted override',song:'wrong title',trackId:123,visible:true});
+      assert.equal(saved.data.artist,'Catalog Artist'); assert.equal(saved.data.song,'Catalog Track');
+      assert.deepEqual(saved.data.music,music);
     }
     for (const cookie of [cookieA, cookieB]) {
       const controller = new AbortController(); streams.push(controller);
@@ -87,6 +98,7 @@ test('PostgreSQL migration, import, real-time sharing, restart persistence and p
     const memoriesB = (await request('memories', cookieB)).data;
     assert.equal(memoriesA.length, 1); assert.equal(memoriesA[0].person.name, 'Bob');
     assert.equal(memoriesB.length, 1); assert.equal(memoriesB[0].person.name, 'Alice');
+    assert.equal(memoriesA[0].person.music.collectionName,'Catalog Album');
     assert.ok(Date.now() - memoriesA[0].at < 6000);
     assert.equal((await request(`memories/${memoriesA[0].id}`, cookieB, 'PATCH', { favorite: true })).response.status, 404);
     assert.equal((await request(`memories/${memoriesA[0].id}`, cookieA, 'PATCH', { favorite: true })).data.favorite, true);
@@ -100,20 +112,25 @@ test('PostgreSQL migration, import, real-time sharing, restart persistence and p
     running = launch(db.url, port); await running.ready;
     assert.equal((await request('session', cookieA)).data.user.name, 'Alice');
     assert.equal((await request('session', cookieA)).data.user.eventId, 'feswave-2026');
+    assert.deepEqual((await request('session', cookieA)).data.user.music,music);
     const persisted = (await request('memories', cookieA)).data;
     assert.equal(persisted.length, 1); assert.equal(persisted[0].favorite, true);
-    await request('profile', cookieB, 'PUT', { name: 'Bob', artist: 'SECRET', visible: false });
+    await request('profile', cookieB, 'PUT', { name: 'Bob', trackId:123, visible: false });
     assert.equal((await request('memories', cookieA)).data.length, 0);
     assert.equal((await db.admin.query('SELECT id FROM memories WHERE person_id=$1', [b.data.user.id])).rowCount, 0);
     const privateStream = new AbortController(); streams.push(privateStream);
     const privateResponse = await fetch(base + 'stream', { headers: { Cookie: cookieB }, signal: privateStream.signal });
     const frame = new TextDecoder().decode((await privateResponse.body.getReader().read()).value);
     assert.doesNotMatch(frame, /SECRET/);
+    assert.doesNotMatch(frame, /Catalog Album|mzstatic/);
+    assert.match(frame,/"music":null/);
     assert.equal((await request('join', cookieA, 'POST', { eventId: 'unknown' })).response.status, 400);
     assert.equal((await request('memories/invalid-id', cookieA, 'PATCH', { favorite: true })).response.status, 404);
     const crossOrigin = await fetch(base + 'react', { method: 'POST', headers: { Cookie: cookieA, Origin: 'http://elsewhere.example' } });
     assert.equal(crossOrigin.status, 403);
     assert.equal((await fetch(`http://127.0.0.1:${port}/.env`)).status, 404);
+    const manual = await request('profile',cookieA,'PUT',{name:'Alice',artist:'Manual Artist',song:'Manual Track',trackId:null,visible:true});
+    assert.equal(manual.data.music,null); assert.equal(manual.data.song,'Manual Track');
     await db.admin.query("UPDATE sessions SET expires_at=NOW()-INTERVAL '1 day' WHERE user_id=$1", [a.data.user.id]);
     assert.equal((await request('memories', cookieA)).response.status, 401);
     assert.notEqual((await request('session', cookieA)).data.user.id, a.data.user.id);

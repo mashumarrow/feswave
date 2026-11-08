@@ -1,4 +1,5 @@
-import type { AppState, PublicUser, Participant, LiveSnapshot, ApiRoutes, Memory } from './types.js';
+import { MusicPicker, musicCard, musicPickerMarkup } from './music.js';
+import type { MusicTrack, AppState, PublicUser, Participant, LiveSnapshot, ApiRoutes, Memory } from './types.js';
 function $<T extends Element = HTMLElement>(selector: string, parent: ParentNode = document): T {
   const element = parent.querySelector<T>(selector);
   if (!element) throw new Error(`Missing element: ${selector}`);
@@ -12,6 +13,7 @@ const colorOf = (value: unknown): string => colors.includes(String(value)) ? Str
 const avatar = (user: Pick<PublicUser, 'name' | 'color'>, size = '') => `<span class="avatar ${colorOf(user.color)} ${size}">${escape(user.name?.slice(0, 1) || '♪')}</span>`;
 const state: AppState = { user: null, events: [], eventId: 'feswave-2026', page: 'live', participants: [], memories: [], filter: 'all', connected: false, taps: 0, level: 0, windowEnds: 0, loading: true, demo: true };
 let stream: EventSource | undefined;
+let musicPicker: MusicPicker | undefined;
 let pendingJoin = false;
 let demoWindow = Math.floor(Date.now() / 5000);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -24,6 +26,7 @@ const demoPeople: Participant[] = [
   { id: 'demo-6', name: 'sora', artist: 'サカナクション', song: '新宝島', color: 'pink', level: 1 },
 ];
 async function api<K extends keyof ApiRoutes>(path: K, options?: RequestInit): Promise<ApiRoutes[K]>;
+async function api(path: `music/search?${string}`, options?: RequestInit): Promise<{ results: MusicTrack[] }>;
 async function api(path: `memories/${string}`, options?: RequestInit): Promise<Memory>;
 async function api(path: string, options: RequestInit = {}): Promise<unknown> {
   const response = await fetch(`/api/${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
@@ -32,8 +35,8 @@ async function api(path: string, options: RequestInit = {}): Promise<unknown> {
   return result;
 }
 function toast(text: string) { clearTimeout(toastTimer); $('#toast').textContent = text; $('#toast').classList.add('show'); toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 4200); }
-function openModal(html: string) { $('#modal-content').innerHTML = html; if (!$<HTMLDialogElement>('#modal').open) $<HTMLDialogElement>('#modal').showModal(); }
-function closeModal() { $<HTMLDialogElement>('#modal').close(); }
+function openModal(html: string) { musicPicker?.destroy(); musicPicker = undefined; $('#modal-content').innerHTML = html; if (!$<HTMLDialogElement>('#modal').open) $<HTMLDialogElement>('#modal').showModal(); }
+function closeModal() { musicPicker?.destroy(); musicPicker = undefined; $<HTMLDialogElement>('#modal').close(); }
 const closeButton = `<button class="modal-close" data-action="close" aria-label="閉じる">${icon('close')}</button>`;
 function currentEvent() { return state.events.find(e => e.id === state.eventId); }
 
@@ -118,13 +121,16 @@ async function react() {
 function profileForm(joinAfter = false) {
   pendingJoin = joinAfter;
   const user = state.user || { name: '', artist: '', song: '', color: 'pink', visible: false };
-  openModal(`<div class="modal-inner">${closeButton}<div class="stepper"><span class="active">01 PROFILE</span><i></i><span>02 READY</span><i></i><span>03 LIVE</span></div><svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">LET'S FIND YOUR WAVE.</div><h2>${user.name ? 'プロフィールを編集' : '「好き」で、つながろう。'}</h2><p class="modal-description">あなたの音楽を、少しだけ教えてください。<br>名前や連絡先の交換なしで、同じ気持ちを共有できます。</p><form id="profile-form"><label class="form-field"><span>ニックネーム <small>必須 · 20文字以内</small></span><input name="name" autocomplete="nickname" placeholder="例：haru" required maxlength="20" value="${escape(user.name)}"></label><div class="form-row"><label class="form-field"><span>好きなアーティスト</span><input name="artist" placeholder="例：YOASOBI" maxlength="60" value="${escape(user.artist)}"></label><label class="form-field"><span>好きな曲</span><input name="song" placeholder="例：群青" maxlength="60" value="${escape(user.song)}"></label></div><div class="form-field"><span>あなたのカラー</span><div class="color-selector">${colors.map(color => `<button type="button" class="color-choice ${colorOf(user.color) === color ? 'selected' : ''}" data-color="${color}" aria-label="${({pink:'ピンク',blue:'ブルー',purple:'パープル',orange:'オレンジ'})[color]}" aria-pressed="${colorOf(user.color) === color}"><span class="avatar small ${color}">♪</span></button>`).join('')}</div><input type="hidden" name="color" value="${colorOf(user.color)}"></div><label class="consent"><input type="checkbox" name="visible" ${user.visible ? 'checked' : ''}><span>公開プロフィールを共有し、共感メモリに残す<small>ニックネーム・好きな曲・アーティストを共有します。<br>オフでも、ニックネームとリアクションは参加中に表示されます。</small></span></label><div class="form-error" id="form-error" role="alert"></div><button class="primary-btn full-width" type="submit">${user.name ? '変更を保存する' : 'プロフィールを登録する'} ${icon('arrow')}</button><p class="member-note">このブラウザのCookieでプロフィールを識別します。共有端末では利用にご注意ください。</p></form></div>`);
+  openModal(`<div class="modal-inner">${closeButton}<div class="stepper"><span class="active">01 PROFILE</span><i></i><span>02 READY</span><i></i><span>03 LIVE</span></div><svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">LET'S FIND YOUR WAVE.</div><h2>${user.name ? 'プロフィールを編集' : '「好き」で、つながろう。'}</h2><p class="modal-description">あなたの音楽を、少しだけ教えてください。<br>名前や連絡先の交換なしで、同じ気持ちを共有できます。</p><form id="profile-form"><label class="form-field"><span>ニックネーム <small>必須 · 20文字以内</small></span><input name="name" autocomplete="nickname" placeholder="例：haru" required maxlength="20" value="${escape(user.name)}"></label>${musicPickerMarkup()}<div class="form-row"><label class="form-field"><span>好きなアーティスト</span><input name="artist" placeholder="例：YOASOBI" maxlength="60" value="${escape(user.artist)}"></label><label class="form-field"><span>好きな曲</span><input name="song" placeholder="例：群青" maxlength="60" value="${escape(user.song)}"></label></div><div class="form-field"><span>あなたのカラー</span><div class="color-selector">${colors.map(color => `<button type="button" class="color-choice ${colorOf(user.color) === color ? 'selected' : ''}" data-color="${color}" aria-label="${({pink:'ピンク',blue:'ブルー',purple:'パープル',orange:'オレンジ'})[color]}" aria-pressed="${colorOf(user.color) === color}"><span class="avatar small ${color}">♪</span></button>`).join('')}</div><input type="hidden" name="color" value="${colorOf(user.color)}"></div><label class="consent"><input type="checkbox" name="visible" ${user.visible ? 'checked' : ''}><span>公開プロフィールを共有し、共感メモリに残す<small>ニックネーム・好きな音楽・ジャケットを共有します。<br>オフでも、ニックネームとリアクションは参加中に表示されます。</small></span></label><div class="form-error" id="form-error" role="alert"></div><button class="primary-btn full-width" type="submit">${user.name ? '変更を保存する' : 'プロフィールを登録する'} ${icon('arrow')}</button><p class="member-note">このブラウザのCookieでプロフィールを識別します。共有端末では利用にご注意ください。</p></form></div>`);
+  musicPicker = new MusicPicker($<HTMLFormElement>('#profile-form'), state.user?.music || null, async (term, signal) => {
+    const result = await api(`music/search?term=${encodeURIComponent(term)}`, { signal }); return result.results;
+  });
 }
 async function saveProfile(form: HTMLFormElement) {
   const button = $<HTMLButtonElement>('button[type="submit"]', form); button.disabled = true;
   const fields = new FormData(form);
   try {
-    state.user = await api('profile', { method: 'PUT', body: JSON.stringify({ name: fields.get('name'), artist: fields.get('artist'), song: fields.get('song'), color: fields.get('color'), visible: fields.get('visible') === 'on' }) });
+    state.user = await api('profile', { method: 'PUT', body: JSON.stringify({ name: fields.get('name'), artist: fields.get('artist'), song: fields.get('song'), color: fields.get('color'), visible: fields.get('visible') === 'on', trackId: musicPicker?.selected?.trackId ?? null }) });
     renderIdentity(); renderProfile();
     if (pendingJoin) showReady(); else { closeModal(); toast('プロフィールを保存しました'); }
   } catch (e) { $('#form-error').textContent = e instanceof Error ? e.message : '保存できませんでした'; button.disabled = false; }
@@ -171,13 +177,13 @@ function renderProfile() {
     return;
   }
   const partners = new Set(state.memories.map(m => m.person.id)).size;
-  $('#profile-content').innerHTML = `<div class="profile-grid"><section class="panel profile-main"><span class="section-kicker">THIS IS YOUR WAVE.</span>${avatar(user, 'large')}<h2>${escape(user.name)}</h2><p>音楽でつながる、もっと近くに。</p><button class="subtle-btn" data-action="edit-profile">${icon('settings')} プロフィールを編集</button><div class="profile-stats"><div><strong>${state.memories.length}</strong><small>共感メモリ</small></div><div><strong>${partners}</strong><small>つながった人</small></div></div></section><div class="profile-details"><section class="panel profile-detail"><div class="section-kicker">${icon('music')} FAVORITE ARTIST</div><h3>${escape(user.artist || 'まだ登録されていません')}</h3><p>心が動く、あなたのアーティスト。</p></section><section class="panel profile-detail"><div class="section-kicker">${icon('heart')} FAVORITE TRACK</div><h3>${escape(user.song || 'まだ登録されていません')}</h3><p>何度でも聴きたくなる、あの一曲。</p></section><section class="panel profile-detail"><span class="section-kicker">PRIVACY & SHARING</span><div class="privacy-status">${icon(user.visible ? 'check' : 'user')} ${user.visible ? 'プロフィール共有：オン' : 'プロフィール共有：オフ'}</div><p>${user.visible ? '共感した相手に、好きな音楽とニックネームを共有します。' : '共感メモリには記録されません。参加中はニックネームと反応のみ表示されます。'}<br>連絡先・正確な位置情報は収集しません。</p></section></div></div>`;
+  $('#profile-content').innerHTML = `<div class="profile-grid"><section class="panel profile-main"><span class="section-kicker">THIS IS YOUR WAVE.</span>${avatar(user, 'large')}<h2>${escape(user.name)}</h2><p>音楽でつながる、もっと近くに。</p><button class="subtle-btn" data-action="edit-profile">${icon('settings')} プロフィールを編集</button><div class="profile-stats"><div><strong>${state.memories.length}</strong><small>共感メモリ</small></div><div><strong>${partners}</strong><small>つながった人</small></div></div></section><div class="profile-details"><section class="panel profile-detail"><div class="section-kicker">${icon('music')} FAVORITE ARTIST</div><h3>${escape(user.artist || 'まだ登録されていません')}</h3><p>心が動く、あなたのアーティスト。</p></section><section class="panel profile-detail"><div class="section-kicker">${icon('heart')} FAVORITE TRACK</div>${user.music ? musicCard(user.music) : `<h3>${escape(user.song || 'まだ登録されていません')}</h3><p>何度でも聴きたくなる、あの一曲。</p>`}</section><section class="panel profile-detail"><span class="section-kicker">PRIVACY & SHARING</span><div class="privacy-status">${icon(user.visible ? 'check' : 'user')} ${user.visible ? 'プロフィール共有：オン' : 'プロフィール共有：オフ'}</div><p>${user.visible ? '共感した相手に、好きな音楽とニックネームを共有します。' : '共感メモリには記録されません。参加中はニックネームと反応のみ表示されます。'}<br>連絡先・正確な位置情報は収集しません。</p></section></div></div>`;
 }
 function personProfile(id: string) {
   const person = (state.demo ? demoPeople : state.participants).find(p => p.id === id);
   if (!person) return;
   // Only the server's public participant projection is available here.
-  openModal(`<div class="modal-inner success-modal">${closeButton}<div class="eyebrow">${state.demo ? 'DEMO PARTICIPANT' : 'ON THE SAME WAVE'}</div><div class="profile-person">${avatar(person, 'large')}</div><h2>${escape(person.name)}</h2><p class="modal-description">${state.demo ? 'デモ参加者のサンプルプロフィールです。' : person.artist || person.song ? '同じライブを楽しんでいる参加者です。' : 'この参加者はプロフィールを公開していません。'}</p>${person.artist ? `<div class="profile-summary">${icon('music')}<div><strong>${escape(person.artist)}</strong><small>${escape(person.song)}</small></div></div>` : ''}<button class="subtle-btn full-width" style="margin-top:20px;justify-content:center" data-action="close">ライブに戻る</button></div>`);
+  openModal(`<div class="modal-inner success-modal">${closeButton}<div class="eyebrow">${state.demo ? 'DEMO PARTICIPANT' : 'ON THE SAME WAVE'}</div><div class="profile-person">${avatar(person, 'large')}</div><h2>${escape(person.name)}</h2><p class="modal-description">${state.demo ? 'デモ参加者のサンプルプロフィールです。' : person.artist || person.song ? '同じライブを楽しんでいる参加者です。' : 'この参加者はプロフィールを公開していません。'}</p>${person.artist ? `<div class="profile-summary">${icon('music')}<div><strong>${escape(person.artist)}</strong><small>${escape(person.song)}</small></div></div>` : ''}${musicCard(person.music)}<button class="subtle-btn full-width" style="margin-top:20px;justify-content:center" data-action="close">ライブに戻る</button></div>`);
 }
 function about() {
   openModal(`<div class="modal-inner">${closeButton}<svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">FEEL THE SAME WAVE.</div><h2>音楽でつながる、<br>もっと近くに。</h2><div class="about-text"><p>FESWAVEは、ライブの感動を言葉を使わずに共有するアプリです。<strong>その瞬間の気持ちをタップ</strong>して届けましょう。</p><p>5秒間に1〜2タップでLevel 1、3〜5タップでLevel 2、6タップ以上でLevel 3。同じイベント・同じ時間帯でレベル差が1以内なら共感候補になります。</p><p>双方がプロフィールの共有を許可すると、5秒の集計後にメモリが保存されます。共有をオフにすると、相手の履歴からあなたの記録も削除されます。</p><p>デモ参加者はサンプル表示です。実際の参加者はイベント参加後に表示されます。現在の曲表示も参考情報です。</p><p>v0.2 ローカルMVP · Bluetooth、Spotify、位置推定、アカウント認証は未実装です。サーバー側に履歴を保存し、Cookieで端末を識別します。</p></div><button class="primary-btn full-width" data-action="close">LET'S FEEL THE WAVE ${icon('arrow')}</button></div>`);
@@ -216,6 +222,7 @@ document.addEventListener('click', async event => {
 $('#tap-button').addEventListener('click', react); $('#orb').addEventListener('click', react);
 document.addEventListener('submit', event => { if (event.target instanceof HTMLFormElement && event.target.id === 'profile-form') { event.preventDefault(); saveProfile(event.target); } });
 document.addEventListener('keydown', event => { if (event.code === 'Space' && state.page === 'live' && !$<HTMLDialogElement>('#modal').open && !['INPUT','TEXTAREA','SELECT','BUTTON','A'].includes((document.activeElement?.tagName || ''))) { event.preventDefault(); if (!event.repeat) react(); } });
+$<HTMLDialogElement>('#modal').addEventListener('close', () => { musicPicker?.destroy(); musicPicker = undefined; });
 $<HTMLDialogElement>('#modal').addEventListener('click', event => { if (event.target === $<HTMLDialogElement>('#modal')) { const r = $<HTMLDialogElement>('#modal').getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeModal(); } });
 $('#crowd').innerHTML = Array.from({ length: 42 }, (_, i) => `<i class="crowd-person" style="left:${i * 2.5}%;height:${22 + ((i * 17) % 26)}px;transform:scale(${.65 + (i % 4) * .16}) rotate(${(i % 5) * 4 - 8}deg)"></i>`).join('');
 $('.today').textContent = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit', year: 'numeric', timeZone: 'Asia/Tokyo' }).format(new Date()).toUpperCase();
