@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#090812">
+  <title>FESWAVE — 音楽でつながる、もっと近くに。</title>
+  <meta name="description" content="同じ瞬間、同じ気持ち。ライブの感動をリアクションで共有するFESWAVE。">
+  <link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/app-shell.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <svg class="svg-library" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 12h4l2-7 4 15 4-17 2 9h4"/></symbol>
+    <symbol id="i-live" viewBox="0 0 24 24"><path d="M5 7a7 7 0 0 0 0 10M2 4a12 12 0 0 0 0 16M19 7a7 7 0 0 1 0 10M22 4a12 12 0 0 1 0 16"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2"/></symbol>
+    <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13M9 8l12-2"/><ellipse cx="5.5" cy="18" rx="3.5" ry="3"/><ellipse cx="17.5" cy="16" rx="3.5" ry="3"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 2 2.7 7.3L22 12l-7.3 2.7L12 22l-2.7-7.3L2 12l7.3-2.7Z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="3"/><circle cx="16" cy="17" r="3"/></symbol>
+    <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M16 5a3 3 0 0 1 0 6m3 3a6 6 0 0 1 3 5v2"/></symbol>
+    <symbol id="i-tap" viewBox="0 0 24 24"><path d="M9 12V5a2 2 0 0 1 4 0v7-2a2 2 0 0 1 4 0v2-1a2 2 0 0 1 4 0v6a6 6 0 0 1-6 6h-2a6 6 0 0 1-5-3L3 13a2 2 0 0 1 3-2l3 3"/></symbol>
+  </defs></svg>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="FESWAVE ホーム"><svg><use href="#i-wave"/></svg><span>FES<span>WAVE</span></span></a>
+    <div class="side-caption">FEEL THE SAME WAVE.</div>
+    <div class="nav-label">YOUR SPACE</div>
+    <nav aria-label="メインナビゲーション">
+      <button class="nav-item active" data-page="live"><svg><use href="#i-live"/></svg><span>ライブ</span><span class="nav-dot"></span></button>
+      <button class="nav-item" data-page="memory"><svg><use href="#i-heart"/></svg><span>メモリ</span><span class="nav-count" id="nav-memory-count">0</span></button>
+      <button class="nav-item" data-page="profile"><svg><use href="#i-user"/></svg><span>プロフィール</span></button>
+    </nav>
+    <div class="side-event"><div class="tiny-label">YOUR NEXT WAVE</div><div class="side-event-art"><span>FES<br>WAVE<span>2026</span></span><i></i><b>♪</b></div><strong>一人でも、ひとりじゃない。</strong><p>同じ音楽を好きな誰かと、<br>今日だけのつながりを。</p><button class="text-link" data-action="events">イベントを探す <svg><use href="#i-arrow"/></svg></button></div>
+    <button class="side-profile" data-page="profile"><span class="avatar small pink" id="side-avatar">♪</span><span><strong id="side-name">Guest</strong><small id="side-status">音楽でつながろう</small></span><svg><use href="#i-settings"/></svg></button>
+  </aside>
+  <main>
+    <header class="topbar"><div class="breadcrumb">YOUR SPACE <span>/</span> <strong id="breadcrumb">Live</strong></div><div class="topbar-right"><span class="today">NOV 08, 2026</span><span class="connection" id="connection"><i></i> DEMO MODE</span><button class="icon-btn mobile-profile" data-page="profile" aria-label="プロフィール"><svg><use href="#i-user"/></svg></button></div></header>
+    <div class="main-content">
+      <section id="page-live" class="page active">
+        <div class="page-title"><div><div class="eyebrow">SAME MUSIC. SAME MOMENT.</div><h1>Live<span class="title-wave"><svg><use href="#i-wave"/></svg></span></h1><p>その高鳴りは、きっと誰かと同じ。</p></div><button class="subtle-btn" data-action="events"><svg><use href="#i-pin"/></svg> イベントを変更 <svg class="chevron"><use href="#i-chevron"/></svg></button></div>
+        <section class="event-banner">
+          <div class="beam beam-one"></div><div class="beam beam-two"></div><div class="beam beam-three"></div><div class="concert-crowd" id="crowd"></div>
+          <div class="event-banner-content"><span class="event-kicker"><i></i> <span id="event-kicker">TODAY'S PICK</span></span><h2 id="event-name">FESWAVE FESTIVAL<span>2026</span></h2><p id="event-subtitle">音楽が、僕らをひとつにする。</p><div class="event-meta"><span><svg><use href="#i-pin"/></svg><span id="event-venue">TOKYO BAY · MAIN STAGE</span></span><span id="event-date">2026.11.08</span></div></div>
+          <div class="event-banner-right"><span class="event-sticker">GOOD MUSIC.<br>BETTER TOGETHER.</span><button class="primary-btn join-btn" data-action="join"><span id="join-label">ライブに参加する</span><svg><use href="#i-arrow"/></svg></button></div>
+        </section>
+        <div class="live-grid">
+          <section class="live-panel panel"><div class="panel-heading"><div><span class="live-label"><i></i> LIVE REACTIONS</span><h2>同じ瞬間、同じ気持ち。</h2></div><span class="people-count"><svg><use href="#i-people"/></svg><span id="participant-count">6</span><small id="participant-unit">DEMO</small></span></div>
+            <div class="wave-stage" id="wave-stage"><div class="radar ring-outer"></div><div class="radar ring-mid"></div><div class="radar ring-inner"></div><div class="radar-cross cross-one"></div><div class="radar-cross cross-two"></div><span class="orbit-spark spark-one">+</span><span class="orbit-spark spark-two">+</span><div id="bubbles" class="bubbles"></div><button class="reaction-orb" id="orb" aria-label="リアクションを送る"><span class="orb-inner"><svg><use href="#i-music"/></svg></span></button><div class="you-label">YOU <span id="your-level">LEVEL 0</span></div><div class="stage-note" id="stage-note"><span></span> 同じ音楽で、つながっている。</div></div>
+            <div class="reaction-controls"><button class="tap-button" id="tap-button"><span class="tap-icon"><svg><use href="#i-tap"/></svg></span><span><strong>Tap to React <svg><use href="#i-spark"/></svg></strong><small>今の気持ちを、タップで届けよう</small></span><span class="tap-key">SPACE</span></button><div class="reaction-meter"><div class="level-bars"><i></i><i></i><i></i></div><span id="tap-count">タップして、盛り上がりをシェア</span><span id="window-count">5 SEC</span></div></div>
+            <div class="panel-footer"><span><i class="legend-dot blue"></i> Level 1 <small>1–2 taps</small></span><span><i class="legend-dot purple"></i> Level 2 <small>3–5 taps</small></span><span><i class="legend-dot pink"></i> Level 3 <small>6+ taps</small></span></div>
+          </section>
+          <aside class="live-right"><section class="panel now-playing"><div class="section-kicker"><svg><use href="#i-music"/></svg> NOW PLAYING <span class="sample-tag">参考セットリスト</span></div><div class="track-art"><div class="art-lines"></div><div class="art-moon"></div><span>THE SOUND<br>OF OUR<br><b>YOUTH.</b></span><small>FESWAVE SELECTION / 01</small><div class="art-disc"></div></div><div class="track-info"><div><h3 id="track-song">群青</h3><p id="track-artist">YOASOBI</p></div><svg class="track-wave"><use href="#i-wave"/></svg></div><p class="track-note">音源の再生・自動曲認識は行いません</p></section>
+            <section class="panel moment-card"><span class="section-kicker"><svg><use href="#i-heart"/></svg> MOMENTS TO KEEP</span><h3>今日の「同じ！」を、<br>明日の思い出に。</h3><p>同じタイミングのリアクションが、<br>あなたのメモリに残ります。</p><div class="mini-avatars"><span class="avatar small blue">♫</span><span class="avatar small purple">✦</span><span class="avatar small pink">♪</span><span class="mini-caption">FEEL IT. KEEP IT.</span></div><button class="text-link" data-page="memory">メモリを見る <svg><use href="#i-arrow"/></svg></button></section>
+          </aside>
+        </div>
+        <div class="bottom-note"><svg><use href="#i-spark"/></svg><p>画面の向こうに、同じ気持ちの誰かがいる。<span>ライブの主役は音楽。スマホは無理のない範囲で。</span></p><button class="text-link" data-action="about">FESWAVEについて <svg><use href="#i-arrow"/></svg></button></div>
+      </section>
+      <section id="page-memory" class="page"><div class="page-title"><div><div class="eyebrow">THE MOMENTS WE SHARED.</div><h1>Memory <svg class="heading-heart"><use href="#i-heart"/></svg></h1><p>あの瞬間、同じ気持ちだった誰か。</p></div><button class="subtle-btn" data-action="export">履歴をダウンロード <svg><use href="#i-arrow"/></svg></button></div><div class="memory-intro panel"><div class="memory-intro-symbol">♡</div><div><span class="section-kicker">YOUR SHARED MOMENTS</span><h2>音が止まっても、つながりは残る。</h2><p>5秒の同じ時間帯に、近い強さで反応した参加者との記録です。</p></div><strong id="memory-total">0<span>MEMORIES</span></strong></div><div class="memory-toolbar"><div class="filter-tabs"><button class="active" data-filter="all">すべて</button><button data-filter="favorite">♡ お気に入り</button></div><span>公開を許可した参加者のみ表示</span></div><div id="memory-list"></div></section>
+      <section id="page-profile" class="page"><div class="page-title"><div><div class="eyebrow">YOUR MUSIC. YOUR IDENTITY.</div><h1>Profile <svg class="heading-heart"><use href="#i-user"/></svg></h1><p>あなたの「好き」が、つながりのきっかけに。</p></div></div><div id="profile-content"></div></section>
+    </div>
+    <footer class="site-footer"><span>FESWAVE <small>© 2026</small></span><span>MADE FOR THE MOMENT.</span><button data-action="about">このアプリについて ↗</button></footer>
+  </main>
+  <nav class="mobile-nav" aria-label="モバイルナビゲーション"><button class="active" data-page="live"><svg><use href="#i-live"/></svg>ライブ</button><button data-page="memory"><svg><use href="#i-heart"/></svg>メモリ</button><button data-page="profile"><svg><use href="#i-user"/></svg>プロフィール</button></nav>
+  <dialog id="modal"><div id="modal-content"></div></dialog><div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

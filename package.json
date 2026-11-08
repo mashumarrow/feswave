@@ -1,0 +1,21 @@
+{
+  "name": "feswave",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "音楽でつながる、FESWAVE リアルタイム交流アプリ",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:server": "node scripts/cargo.mjs build",
+    "start": "npm run build && node scripts/cargo.mjs run",
+    "dev": "npm start",
+    "test": "npm run typecheck && node scripts/cargo.mjs test && node scripts/cargo.mjs build && node --test test/server.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

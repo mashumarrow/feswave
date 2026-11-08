@@ -1,0 +1,8 @@
+.data/
+node_modules/
+.env
+*.log
+.tools/
+target/
+public/app.js
+public/types.js
