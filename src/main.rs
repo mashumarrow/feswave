@@ -102,6 +102,7 @@ struct Inner {
     users: HashMap<String, User>,
     reactions: HashMap<String, Reaction>,
     clients: HashMap<String, LiveConnection>,
+    sides: HashMap<String, (Side, u64)>,
     last_window: u64,
 }
 
@@ -109,6 +110,7 @@ struct App {
     inner: Mutex<Inner>,
     updates: broadcast::Sender<()>,
     store: Store,
+    rssi_center_db: Option<f64>,
     events: Value,
     public_dir: PathBuf,
 }
@@ -203,7 +205,9 @@ async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Res
 
     inner.users.insert(user.id.clone(), user.clone());
 
-    let mut response = Json(json!({"user":user,"events":app.events})).into_response();
+    let mut response =
+        Json(json!({"user":user,"events":app.events,"rssiCenterDb":app.rssi_center_db}))
+            .into_response();
 
     if let Some(cookie) = cookie {
         response
@@ -294,6 +298,7 @@ async fn join_event(
 
     if user.event_id.as_deref() != Some(input.event_id.as_str()) {
         inner.reactions.retain(|_, r| r.user_id != user.id);
+        inner.sides.remove(&user.id);
     }
 
     user.event_id = Some(input.event_id.clone());
@@ -352,6 +357,9 @@ async fn settle(app: &App, inner: &mut Inner, time: u64) -> ApiResult<()> {
     app.store.insert_memories(&memories).await?;
     inner.reactions.retain(|_, r| r.window >= window);
     inner.last_window = window;
+    inner
+        .sides
+        .retain(|_, (_, seen)| time.saturating_sub(*seen) < 65_000);
     app.notify();
 
     Ok(())
@@ -404,6 +412,42 @@ async fn react(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Json<
     Ok(Json(response))
 }
 
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum Side {
+    Left,
+    Right,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PositionInput {
+    event_id: String,
+    side: Option<Side>,
+}
+
+async fn position(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Json(input): Json<PositionInput>,
+) -> ApiResult<Json<Value>> {
+    if app.rssi_center_db.is_none() {
+        return Err(bad("会場測位は無効です"));
+    }
+    let mut inner = app.inner.lock().await;
+    let user = authenticated(&headers, &app.store).await?;
+    if user.event_id.as_deref() != Some(&input.event_id) {
+        return Err(bad("イベントが一致しません"));
+    }
+    if let Some(side) = input.side {
+        inner.sides.insert(user.id, (side, now()));
+    } else {
+        inner.sides.remove(&user.id);
+    }
+    app.notify();
+    Ok(Json(json!({})))
+}
+
 fn snapshot(inner: &Inner, uid: &str) -> Value {
     let event_id = inner
         .users
@@ -442,6 +486,13 @@ fn snapshot(inner: &Inner, uid: &str) -> Value {
             let mut value = serde_json::to_value(u.public()).ok()?;
             value["taps"] = json!(taps);
             value["level"] = json!(strength(taps));
+            value["side"] = json!(
+                inner
+                    .sides
+                    .get(id)
+                    .filter(|(_, seen)| time.saturating_sub(*seen) < 65_000)
+                    .map(|(side, _)| side)
+            );
 
             Some(value)
         })
@@ -560,6 +611,7 @@ async fn static_file(State(app): State<Shared>, req: Request) -> Response {
 
     let (file, content_type) = match req.uri().path() {
         "/" => ("index.html", "text/html; charset=utf-8"),
+        "/venue-position.js" => ("venue-position.js", "text/javascript; charset=utf-8"),
         "/app.js" => ("app.js", "text/javascript; charset=utf-8"),
         "/styles.css" => ("styles.css", "text/css; charset=utf-8"),
         "/app-shell.css" => ("app-shell.css", "text/css; charset=utf-8"),
@@ -573,7 +625,7 @@ async fn static_file(State(app): State<Shared>, req: Request) -> Response {
     }
 }
 
-async fn security(req: Request, next: Next) -> Response {
+async fn security(State(app): State<Shared>, req: Request, next: Next) -> Response {
     if let Some(origin) = req
         .headers()
         .get(header::ORIGIN)
@@ -598,7 +650,11 @@ async fn security(req: Request, next: Next) -> Response {
         ("referrer-policy", "same-origin"),
         (
             "content-security-policy",
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+            if app.rssi_center_db.is_some() {
+                "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://192.168.4.1; script-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+            } else {
+                "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+            },
         ),
     ] {
         response.headers_mut().insert(
@@ -638,11 +694,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let events = store.events().await?;
     let (updates, _) = broadcast::channel(128);
 
+    let rssi_center_db = std::env::var("FESWAVE_RSSI_CENTER_DB")
+        .ok()
+        .map(|s| s.parse::<f64>())
+        .transpose()?;
+    if rssi_center_db.is_some_and(|v| !v.is_finite()) {
+        return Err("Invalid FESWAVE_RSSI_CENTER_DB".into());
+    }
     let app = Arc::new(App {
+        rssi_center_db,
         inner: Mutex::new(Inner {
             users,
             reactions: HashMap::new(),
             clients: HashMap::new(),
+            sides: HashMap::new(),
             last_window: window_id(now()),
         }),
         updates,
@@ -670,13 +735,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/session", get(session))
         .route("/api/profile", put(profile))
         .route("/api/join", post(join_event))
+        .route("/api/position", put(position))
         .route("/api/react", post(react))
         .route("/api/stream", get(stream))
         .route("/api/memories", get(memories))
         .route("/api/memories/{id}", patch(favorite))
         .fallback(static_file)
         .layer(DefaultBodyLimit::max(8192))
-        .layer(middleware::from_fn(security))
+        .layer(middleware::from_fn_with_state(app.clone(), security))
         .with_state(app);
 
     let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".into());

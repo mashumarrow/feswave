@@ -12,7 +12,7 @@ import { isolatedDatabase } from './database.mjs';
 const binary = fileURLToPath(new URL(process.platform === 'win32' ? '../target/debug/feswave.exe' : '../target/debug/feswave', import.meta.url));
 
 function launch(databaseUrl, port, args = []) {
-  const child = spawn(binary, args, { env: { ...process.env, HOST: '127.0.0.1', PORT: String(port), DATABASE_URL: databaseUrl }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(binary, args, { env: { ...process.env, FESWAVE_RSSI_CENTER_DB: '3.5', HOST: '127.0.0.1', PORT: String(port), DATABASE_URL: databaseUrl }, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderr = ''; let stdout = '';
   child.stderr.on('data', data => { stderr += data; });
   child.stdout.on('data', data => { stdout += data; });
@@ -75,12 +75,20 @@ test('PostgreSQL migration, import, real-time sharing, restart persistence and p
     assert.equal((await request('join', cookieA, 'POST', { eventId: 'feswave-2026' })).response.status, 200);
     assert.equal((await request('join', cookieA, 'POST', { eventId: 'night-groove' })).response.status, 409);
     assert.equal((await request('session', cookieA)).data.user.eventId, 'feswave-2026');
+    assert.equal(a.data.rssiCenterDb, 3.5);
+    const location = {eventId:'feswave-2026', side:'left'};
+    assert.equal((await request('position', '', 'PUT', location)).response.status, 401);
+    assert.equal((await request('position', cookieA, 'PUT', {...location, eventId:'unknown'})).response.status, 400);
+    assert.equal((await request('position', cookieA, 'PUT', location)).response.status, 200);
     for (const cookie of [cookieA, cookieB]) {
       const controller = new AbortController(); streams.push(controller);
       const response = await fetch(base + 'stream', { headers: { Cookie: cookie }, signal: controller.signal });
       assert.equal(response.headers.get('content-type'), 'text/event-stream');
       const reader = response.body.getReader();
-      assert.match(new TextDecoder().decode((await reader.read()).value), /participants/);
+      const initial = new TextDecoder().decode((await reader.read()).value);
+      const snapshot = JSON.parse(initial.split('data: ')[1].trim());
+      assert.equal(snapshot.participants.find(p => p.id === a.data.user.id).side, 'left');
+      if (cookie === cookieB) assert.equal(snapshot.participants.find(p => p.id === b.data.user.id).side, null);
       (async () => { try { while (!(await reader.read()).done) {} } catch {} })();
     }
     await new Promise(resolve => setTimeout(resolve, 5000 - Date.now() % 5000 + 80));

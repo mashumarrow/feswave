@@ -1,3 +1,4 @@
+import { trackVenuePosition } from './venue-position.js';
 import type { AppState, PublicUser, Participant, LiveSnapshot, ApiRoutes, Memory } from './types.js';
 function $<T extends Element = HTMLElement>(selector: string, parent: ParentNode = document): T {
   const element = parent.querySelector<T>(selector);
@@ -12,6 +13,8 @@ const colorOf = (value: unknown): string => colors.includes(String(value)) ? Str
 const avatar = (user: Pick<PublicUser, 'name' | 'color'>, size = '') => `<span class="avatar ${colorOf(user.color)} ${size}">${escape(user.name?.slice(0, 1) || '♪')}</span>`;
 const state: AppState = { user: null, events: [], eventId: 'feswave-2026', page: 'live', participants: [], memories: [], filter: 'all', connected: false, taps: 0, level: 0, windowEnds: 0, loading: true, demo: true };
 let stream: EventSource | undefined;
+let rssiCenterDb: number | null = null;
+let positionTracker: AbortController | undefined;
 let pendingJoin = false;
 let demoWindow = Math.floor(Date.now() / 5000);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -71,6 +74,14 @@ function setConnection(status: string) {
   node.innerHTML = `<i></i> ${status === 'demo' ? 'DEMO MODE' : status === 'online' ? 'CONNECTED' : 'RECONNECTING'}`;
 }
 function connect() {
+  positionTracker?.abort();
+  if (rssiCenterDb !== null) {
+    const controller = positionTracker = new AbortController();
+    const eventId = state.eventId;
+    void trackVenuePosition(rssiCenterDb, controller.signal, async side => {
+      await api('position', { method: 'PUT', signal: controller.signal, body: JSON.stringify({ eventId, side }) });
+    });
+  }
   if (stream) stream.close();
   setConnection('connecting'); stream = new EventSource('/api/stream');
   stream.onmessage = event => {
@@ -89,8 +100,26 @@ function renderBubbles() {
   const users = state.demo ? demoPeople : state.participants.filter(p => p.id !== state.user?.id);
   $('#participant-count').textContent = state.demo ? '6' : String(state.participants.length);
   $('#participant-unit').textContent = state.demo ? 'DEMO' : 'ONLINE';
-  $('#bubbles').innerHTML = users.slice(0, 10).map((u, i) => `<button class="bubble level-${u.level} ${u.level ? '' : 'no-reaction'} view-profile" data-person="${escape(u.id)}" style="left:${positions[i][0]}%;top:${positions[i][1]}%" aria-label="${escape(u.name)}の公開プロフィール">${avatar(u)}<small>${escape(u.name)}${state.demo ? ' · demo' : ''}</small></button>`).join('');
-  if (users.length > 10) $('#bubbles').insertAdjacentHTML('beforeend', `<span class="more-people">+ ${users.length - 10} 人が参加中</span>`);
+  const mapped = !state.demo && rssiCenterDb !== null;
+  $('#wave-stage').classList.toggle('mapped', mapped);
+  $('#orb-label').textContent = mapped ? 'TAP' : 'YOU';
+  const unknown = $('#unlocated');
+  unknown.hidden = true;
+  if (mapped) {
+    const people = state.participants;
+    const renderPerson = (p: Participant) => {
+      const mine = p.id === state.user?.id;
+      return `<button class="venue-person level-${p.level} view-profile" data-person="${escape(p.id)}">${avatar(p)}<small>${mine ? '自分' : escape(p.name)}</small></button>`;
+    };
+    $('#bubbles').innerHTML = (['left', 'right'] as const).map(side =>
+      `<div class="venue-column"><b>${side === 'left' ? '左側' : '右側'}</b>${people.filter(p => p.side === side).map(renderPerson).join('')}</div>`).join('');
+    const waiting = people.filter(p => !p.side);
+    unknown.hidden = !waiting.length;
+    unknown.innerHTML = '<small>位置未確定</small>' + waiting.map(renderPerson).join('');
+  } else {
+    $('#bubbles').innerHTML = users.slice(0, 10).map((u, i) => `<button class="bubble level-${u.level} ${u.level ? '' : 'no-reaction'} view-profile" data-person="${escape(u.id)}" style="left:${positions[i][0]}%;top:${positions[i][1]}%" aria-label="${escape(u.name)}の公開プロフィール">${avatar(u)}<small>${escape(u.name)}${state.demo ? ' · demo' : ''}</small></button>`).join('');
+    if (users.length > 10) $('#bubbles').insertAdjacentHTML('beforeend', `<span class="more-people">+ ${users.length - 10} 人が参加中</span>`);
+  }
   const shared = users.filter(u => u.level && state.level && Math.abs(u.level - state.level) <= 1).length;
   $('#stage-note').innerHTML = `<span></span> ${state.demo ? (state.taps ? 'デモ体験中 · 履歴には保存されません' : '同じ音楽で、つながっている。') : !users.length ? '参加者を待っています。別のブラウザから参加できます。' : shared ? `${shared}人と同じ盛り上がり！ 集計終了を待とう` : '気持ちが動いた瞬間に、タップしよう。'}`;
 }
@@ -117,7 +146,7 @@ async function react() {
 function profileForm(joinAfter = false) {
   pendingJoin = joinAfter;
   const user = state.user || { name: '', artist: '', song: '', visible: false };
-  openModal(`<div class="modal-inner">${closeButton}<div class="stepper"><span class="active">01 PROFILE</span><i></i><span>02 READY</span><i></i><span>03 LIVE</span></div><svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">LET'S FIND YOUR WAVE.</div><h2>${user.name ? 'プロフィールを編集' : '「好き」で、つながろう。'}</h2><p class="modal-description">あなたの音楽を、少しだけ教えてください。<br>名前や連絡先の交換なしで、同じ気持ちを共有できます。</p><form id="profile-form"><label class="form-field"><span>ニックネーム <small>必須 · 20文字以内</small></span><input name="name" autocomplete="nickname" placeholder="例：haru" required maxlength="20" value="${escape(user.name)}"></label><div class="form-row"><label class="form-field"><span>好きなアーティスト</span><input name="artist" placeholder="例：YOASOBI" maxlength="60" value="${escape(user.artist)}"></label><label class="form-field"><span>好きな曲</span><input name="song" placeholder="例：群青" maxlength="60" value="${escape(user.song)}"></label></div><label class="consent"><input type="checkbox" name="visible" ${user.visible ? 'checked' : ''}><span>公開プロフィールを共有し、共感メモリに残す<small>ニックネーム・好きな曲・アーティストを共有します。<br>オフでも、ニックネームとリアクションは参加中に表示されます。</small></span></label><div class="form-error" id="form-error" role="alert"></div><button class="primary-btn full-width" type="submit">${user.name ? '変更を保存する' : 'プロフィールを登録する'} ${icon('arrow')}</button><p class="member-note">このブラウザのCookieでプロフィールを識別します。共有端末では利用にご注意ください。</p></form></div>`);
+  openModal(`<div class="modal-inner">${closeButton}<div class="stepper"><span class="active">01 PROFILE</span><i></i><span>02 READY</span><i></i><span>03 LIVE</span></div><svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">LET'S FIND YOUR WAVE.</div><h2>${user.name ? 'プロフィールを編集' : '「好き」で、つながろう。'}</h2><p class="modal-description">あなたの音楽を、少しだけ教えてください。<br>名前や連絡先の交換なしで、同じ気持ちを共有できます。</p><form id="profile-form"><label class="form-field"><span>ニックネーム <small>必須 · 20文字以内</small></span><input name="name" autocomplete="nickname" placeholder="例：haru" required maxlength="20" value="${escape(user.name)}"></label><div class="form-row"><label class="form-field"><span>好きなアーティスト</span><input name="artist" placeholder="例：YOASOBI" maxlength="60" value="${escape(user.artist)}"></label><label class="form-field"><span>好きな曲</span><input name="song" placeholder="例：群青" maxlength="60" value="${escape(user.song)}"></label></div><label class="consent"><input type="checkbox" name="visible" ${user.visible ? 'checked' : ''}><span>公開プロフィールを共有し、共感メモリに残す<small>ニックネーム・好きな曲・アーティストを共有します。<br>参加中はニックネーム・反応と、測位時の左右エリアが表示されます。</small></span></label><div class="form-error" id="form-error" role="alert"></div><button class="primary-btn full-width" type="submit">${user.name ? '変更を保存する' : 'プロフィールを登録する'} ${icon('arrow')}</button><p class="member-note">このブラウザのCookieでプロフィールを識別します。共有端末では利用にご注意ください。</p></form></div>`);
 }
 async function saveProfile(form: HTMLFormElement) {
   const button = $<HTMLButtonElement>('button[type="submit"]', form); button.disabled = true;
@@ -167,7 +196,7 @@ function renderProfile() {
     return;
   }
   const partners = new Set(state.memories.map(m => m.person.id)).size;
-  $('#profile-content').innerHTML = `<div class="profile-grid"><section class="panel profile-main"><span class="section-kicker">THIS IS YOUR WAVE.</span>${avatar(user, 'large')}<h2>${escape(user.name)}</h2><p>音楽でつながる、もっと近くに。</p><button class="subtle-btn" data-action="edit-profile">${icon('settings')} プロフィールを編集</button><div class="profile-stats"><div><strong>${state.memories.length}</strong><small>共感メモリ</small></div><div><strong>${partners}</strong><small>つながった人</small></div></div></section><div class="profile-details"><section class="panel profile-detail"><div class="section-kicker">${icon('music')} FAVORITE ARTIST</div><h3>${escape(user.artist || 'まだ登録されていません')}</h3><p>心が動く、あなたのアーティスト。</p></section><section class="panel profile-detail"><div class="section-kicker">${icon('heart')} FAVORITE TRACK</div><h3>${escape(user.song || 'まだ登録されていません')}</h3><p>何度でも聴きたくなる、あの一曲。</p></section><section class="panel profile-detail"><span class="section-kicker">PRIVACY & SHARING</span><div class="privacy-status">${icon(user.visible ? 'check' : 'user')} ${user.visible ? 'プロフィール共有：オン' : 'プロフィール共有：オフ'}</div><p>${user.visible ? '共感した相手に、好きな音楽とニックネームを共有します。' : '共感メモリには記録されません。参加中はニックネームと反応のみ表示されます。'}<br>連絡先・正確な位置情報は収集しません。</p></section></div></div>`;
+  $('#profile-content').innerHTML = `<div class="profile-grid"><section class="panel profile-main"><span class="section-kicker">THIS IS YOUR WAVE.</span>${avatar(user, 'large')}<h2>${escape(user.name)}</h2><p>音楽でつながる、もっと近くに。</p><button class="subtle-btn" data-action="edit-profile">${icon('settings')} プロフィールを編集</button><div class="profile-stats"><div><strong>${state.memories.length}</strong><small>共感メモリ</small></div><div><strong>${partners}</strong><small>つながった人</small></div></div></section><div class="profile-details"><section class="panel profile-detail"><div class="section-kicker">${icon('music')} FAVORITE ARTIST</div><h3>${escape(user.artist || 'まだ登録されていません')}</h3><p>心が動く、あなたのアーティスト。</p></section><section class="panel profile-detail"><div class="section-kicker">${icon('heart')} FAVORITE TRACK</div><h3>${escape(user.song || 'まだ登録されていません')}</h3><p>何度でも聴きたくなる、あの一曲。</p></section><section class="panel profile-detail"><span class="section-kicker">PRIVACY & SHARING</span><div class="privacy-status">${icon(user.visible ? 'check' : 'user')} ${user.visible ? 'プロフィール共有：オン' : 'プロフィール共有：オフ'}</div><p>${user.visible ? '共感した相手に、好きな音楽とニックネームを共有します。' : '共感メモリには記録されません。参加中はニックネーム・反応と、測位時の左右エリアが表示されます。'}<br>連絡先・正確な位置情報は収集しません。</p></section></div></div>`;
 }
 function personProfile(id: string) {
   const person = (state.demo ? demoPeople : state.participants).find(p => p.id === id);
@@ -176,7 +205,7 @@ function personProfile(id: string) {
   openModal(`<div class="modal-inner success-modal">${closeButton}<div class="eyebrow">${state.demo ? 'DEMO PARTICIPANT' : 'ON THE SAME WAVE'}</div><div class="profile-person">${avatar(person, 'large')}</div><h2>${escape(person.name)}</h2><p class="modal-description">${state.demo ? 'デモ参加者のサンプルプロフィールです。' : person.artist || person.song ? '同じライブを楽しんでいる参加者です。' : 'この参加者はプロフィールを公開していません。'}</p>${person.artist ? `<div class="profile-summary">${icon('music')}<div><strong>${escape(person.artist)}</strong><small>${escape(person.song)}</small></div></div>` : ''}<button class="subtle-btn full-width" style="margin-top:20px;justify-content:center" data-action="close">ライブに戻る</button></div>`);
 }
 function about() {
-  openModal(`<div class="modal-inner">${closeButton}<svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">FEEL THE SAME WAVE.</div><h2>音楽でつながる、<br>もっと近くに。</h2><div class="about-text"><p>FESWAVEは、ライブの感動を言葉を使わずに共有するアプリです。<strong>その瞬間の気持ちをタップ</strong>して届けましょう。</p><p>5秒間に1〜2タップでLevel 1、3〜5タップでLevel 2、6タップ以上でLevel 3。同じイベント・同じ時間帯でレベル差が1以内なら共感候補になります。</p><p>双方がプロフィールの共有を許可すると、5秒の集計後にメモリが保存されます。共有をオフにすると、相手の履歴からあなたの記録も削除されます。</p><p>デモ参加者はサンプル表示です。実際の参加者はイベント参加後に表示されます。</p><p>v0.2 ローカルMVP · Bluetooth、Spotify、位置推定、アカウント認証は未実装です。サーバー側に履歴を保存し、Cookieで端末を識別します。</p></div><button class="primary-btn full-width" data-action="close">LET'S FEEL THE WAVE ${icon('arrow')}</button></div>`);
+  openModal(`<div class="modal-inner">${closeButton}<svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">FEEL THE SAME WAVE.</div><h2>音楽でつながる、<br>もっと近くに。</h2><div class="about-text"><p>FESWAVEは、ライブの感動を言葉を使わずに共有するアプリです。<strong>その瞬間の気持ちをタップ</strong>して届けましょう。</p><p>5秒間に1〜2タップでLevel 1、3〜5タップでLevel 2、6タップ以上でLevel 3。同じイベント・同じ時間帯でレベル差が1以内なら共感候補になります。</p><p>双方がプロフィールの共有を許可すると、5秒の集計後にメモリが保存されます。共有をオフにすると、相手の履歴からあなたの記録も削除されます。</p><p>デモ参加者はサンプル表示です。実際の参加者はイベント参加後に表示されます。</p><p>v0.2 ローカルMVP · Bluetooth、Spotify、アカウント認証は未実装です。サーバー側に履歴を保存し、Cookieで端末を識別します。</p></div><button class="primary-btn full-width" data-action="close">LET'S FEEL THE WAVE ${icon('arrow')}</button></div>`);
 }
 document.addEventListener('click', async event => {
   const target = (event.target instanceof Element ? event.target.closest('button') : null); if (!target) return;
@@ -213,7 +242,7 @@ setInterval(() => { if (!state.demo) { refreshMemories().then(() => { if (state.
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !state.demo) refreshMemories(); });
 renderBubbles(); renderProfile(); renderMemories();
 try {
-  const data = await api('session'); state.user = data.user; state.events = data.events; state.loading = false;
+  const data = await api('session'); rssiCenterDb = data.rssiCenterDb ?? null; state.user = data.user; state.events = data.events; state.loading = false;
   if (state.user.eventId && state.user.name) { state.eventId = state.user.eventId; state.demo = false; connect(); }
   renderEvent(); renderBubbles(); renderProfile(); await refreshMemories();
 } catch (e) { state.loading = false; toast('サーバーに接続できません。npm start で起動してください。'); }

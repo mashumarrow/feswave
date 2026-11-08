@@ -135,6 +135,14 @@ String freshValue(const Reading (&table)[capacity], const Mac &mac, uint32_t now
 }
 
 void sendMeasurement() {
+  // The venue app runs on a PC on this AP, or on localhost via adb reverse.
+  const String origin = web.header("Origin");
+  if (origin == "http://localhost:3000" || origin == "http://127.0.0.1:3000" ||
+      (origin.startsWith("http://192.168.4.") && origin.endsWith(":3000") &&
+       origin == "http://192.168.4." + String(origin.substring(17).toInt()) + ":3000")) {
+    web.sendHeader("Access-Control-Allow-Origin", origin);
+    web.sendHeader("Vary", "Origin");
+  }
   Mac mac{};
   web.sendHeader("Cache-Control", "no-store");
   if (!requestMac(mac)) {
@@ -207,6 +215,8 @@ void setup() {
   Mac bssid;
   WiFi.softAPmacAddress(bssid);
   startRadio(bssid);
+  const char *headers[] = {"Origin"};
+  web.collectHeaders(headers, 1);
   web.on("/", HTTP_GET, [] { web.send_P(200, "text/html; charset=utf-8", dashboard); });
   web.on("/api/me", HTTP_GET, sendMeasurement);
   web.begin();

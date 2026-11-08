@@ -80,3 +80,13 @@ dialog { width: min(398px, calc(100vw - 24px)); max-height: calc(100dvh - 28px);
   .event-meta { font-size: 7px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+.mapped .bubbles { display:flex; justify-content:space-between; padding:12px 4% 38px; pointer-events:none; }
+.venue-column { width:26%; display:flex; flex-direction:column; align-items:center; gap:6px; overflow:auto; pointer-events:auto; }
+.venue-column>b,.unlocated>small { font-size:11px; color:var(--muted); }
+.venue-person { display:inline-flex; align-items:center; flex-direction:column; gap:2px; color:inherit; background:transparent; border:0; cursor:pointer; }
+.venue-person small { max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.venue-person.level-1 .avatar { box-shadow:0 0 9px var(--cyan); }
+.venue-person.level-2 .avatar { box-shadow:0 0 14px var(--purple); }
+.venue-person.level-3 .avatar { box-shadow:0 0 20px var(--pink); }
+.unlocated:not([hidden]) { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:8px 16px; }
