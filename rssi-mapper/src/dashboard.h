@@ -25,11 +25,23 @@ function showBias(){
   el('offset').textContent='中央の補正値 '+bias.toFixed(1)+' dB（このページのみ）';
   el('reset').hidden=bias===0;
 }
+const differences=[];
+function updateMeasurement(data){
+  const {left,right,online}=data;
+  if(online && Number.isFinite(left) && Number.isFinite(right)){
+    differences.push(right-left);
+    if(differences.length>3)differences.shift();
+    const sorted=[...differences].sort((a,b)=>a-b);
+    delta=(sorted[Math.floor((sorted.length-1)/2)]+sorted[Math.floor(sorted.length/2)])/2;
+  }else{
+    differences.length=0;delta=null;
+  }
+  render(data);
+}
 function render(data){
   const {left,right,online}=data;
   for(const [id,value] of Object.entries({left,right}))
     el(id).textContent=Number.isFinite(value)?value.toFixed(1)+' dBm':'—';
-  delta=online && Number.isFinite(left) && Number.isFinite(right)?right-left:null;
   el('cal').disabled=delta===null;
   el('marker').hidden=delta===null;
   el('status').textContent=online?'右受信機 接続中':'右受信機の通信待ち';
@@ -62,9 +74,9 @@ async function poll(){
   try{
     const response=await fetch('/api/me'+(label?'?'+params:''),{cache:'no-store',signal:AbortSignal.timeout(3000)});
     if(!response.ok)throw Error();
-    latest=await response.json();render(latest);
+    latest=await response.json();updateMeasurement(latest);
     if(label && delta!==null)received++;
-  }catch{latest={};render(latest);el('status').textContent='左受信機と通信できません。Wi-Fi接続を確認してください。'}
+  }catch{latest={};updateMeasurement(latest);el('status').textContent='左受信機と通信できません。Wi-Fi接続を確認してください。'}
   setTimeout(poll,500);
 }
 showBias();poll();</script></html>)HTML";
