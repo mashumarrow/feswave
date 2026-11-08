@@ -275,6 +275,16 @@ async fn join_event(
     {
         return Err(bad("イベントを選んでください"));
     }
+    if inner.db.users[&uid]
+        .event_id
+        .as_deref()
+        .is_some_and(|event_id| event_id != input.event_id)
+    {
+        return Err(error(
+            StatusCode::CONFLICT,
+            "参加後にイベントを変更することはできません",
+        ));
+    }
     if inner.db.users[&uid].event_id.as_deref() != Some(&input.event_id) {
         inner.reactions.retain(|_, r| r.user_id != uid);
     }

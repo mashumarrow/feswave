@@ -33,6 +33,9 @@ test('two independent clients share reactions, keep consented memories and revok
       assert.equal((await request('profile', cookie, 'PUT', { name, artist: 'YOASOBI', song: '群青', color: 'pink', visible: true })).response.status, 200);
       assert.equal((await request('join', cookie, 'POST', { eventId: 'feswave-2026' })).response.status, 200);
     }
+    assert.equal((await request('join', cookieA, 'POST', { eventId: 'feswave-2026' })).response.status, 200);
+    assert.equal((await request('join', cookieA, 'POST', { eventId: 'night-groove' })).response.status, 409);
+    assert.equal((await request('session', cookieA)).data.user.eventId, 'feswave-2026');
     for (const cookie of [cookieA, cookieB]) {
       const controller = new AbortController(); streams.push(controller);
       const response = await fetch(base + 'stream', { headers: { Cookie: cookie }, signal: controller.signal });
