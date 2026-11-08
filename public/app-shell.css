@@ -35,7 +35,6 @@ h1 { font-size: 30px; }
 .panel-footer small { font-size: 7px; }
 .live-right { gap: 12px; }
 .section-kicker { font-size: 7px; }
-.track-note { font-size: 8px; }
 .moment-card p { font-size: 10px; }
 .moment-card .text-link { font-size: 10px; min-height: 44px; }
 .bottom-note p { font-size: 10px; }
@@ -54,7 +53,6 @@ dialog { width: min(398px, calc(100vw - 24px)); max-height: calc(100dvh - 28px);
 .form-field small { font-size: 10px; }
 .form-row { grid-template-columns: 1fr; gap: 0; }
 .form-row .form-field { margin: 8px 0 12px; }
-.color-choice { min-width: 44px; min-height: 44px; }
 .consent { font-size: 12px; }
 .consent input { min-width: 20px; min-height: 20px; }
 .consent small, .member-note { font-size: 10px; }
@@ -80,8 +78,5 @@ dialog { width: min(398px, calc(100vw - 24px)); max-height: calc(100dvh - 28px);
   .reaction-controls { padding-inline: 14px; }
   .reaction-meter { font-size: 8px; }
   .event-meta { font-size: 7px; }
-  .live-right { grid-template-columns: 1fr; }
-  .track-art { aspect-ratio: 1.8; }
-  .track-art > span { font-size: 26px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

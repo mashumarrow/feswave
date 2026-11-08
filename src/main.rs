@@ -34,9 +34,11 @@ fn now() -> u64 {
         .unwrap_or_default()
         .as_millis() as u64
 }
+
 fn id() -> String {
     Uuid::new_v4().to_string()
 }
+
 fn clean(value: &str, length: usize) -> String {
     value.trim().chars().take(length).collect()
 }
@@ -71,6 +73,7 @@ struct PublicUser {
     #[serde(default)]
     tracks: sqlx::types::Json<Vec<MusicTrack>>,
 }
+
 impl User {
     fn public(&self) -> PublicUser {
         PublicUser {
@@ -116,12 +119,14 @@ struct Memory {
 struct LiveConnection {
     user_id: String,
 }
+
 struct Inner {
     users: HashMap<String, User>,
     reactions: HashMap<String, Reaction>,
     clients: HashMap<String, LiveConnection>,
     last_window: u64,
 }
+
 struct App {
     inner: Mutex<Inner>,
     updates: broadcast::Sender<()>,
@@ -130,21 +135,26 @@ struct App {
     public_dir: PathBuf,
     music: MusicService,
 }
+
 type Shared = Arc<App>;
 
 #[derive(Debug)]
 struct ApiError(StatusCode, String);
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         (self.0, Json(json!({ "error": self.1 }))).into_response()
     }
 }
+
 fn error(status: StatusCode, text: &str) -> ApiError {
     ApiError(status, text.into())
 }
+
 fn bad(text: &str) -> ApiError {
     error(StatusCode::BAD_REQUEST, text)
 }
+
 type ApiResult<T> = Result<T, ApiError>;
 
 impl From<sqlx::Error> for ApiError {
@@ -156,6 +166,7 @@ impl From<sqlx::Error> for ApiError {
         )
     }
 }
+
 impl App {
     fn notify(&self) {
         let _ = self.updates.send(());
@@ -171,11 +182,13 @@ async fn authenticated(headers: &HeaderMap, store: &Store) -> ApiResult<User> {
                 .split(';')
                 .find_map(|item| item.trim().strip_prefix("feswave="))
         });
+
     if let Some(token) = token.filter(|t| t.len() <= 128) {
         if let Some(user) = store.session_user(token).await? {
             return Ok(user);
         }
     }
+
     Err(error(
         StatusCode::UNAUTHORIZED,
         "再読み込みして接続してください",
@@ -184,6 +197,7 @@ async fn authenticated(headers: &HeaderMap, store: &Store) -> ApiResult<User> {
 
 async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Response> {
     let mut inner = app.inner.lock().await;
+
     let (user, cookie) = match authenticated(&headers, &app.store).await {
         Ok(user) => (user, None),
         Err(e) if e.0 == StatusCode::UNAUTHORIZED => {
@@ -199,8 +213,10 @@ async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Res
                 tracks: sqlx::types::Json(vec![]),
                 favorite_track_id: None,
             };
+
             let token = id();
             app.store.create_session(&user, &token).await?;
+
             (
                 user,
                 Some(format!(
@@ -210,13 +226,17 @@ async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Res
         }
         Err(e) => return Err(e),
     };
+
     inner.users.insert(user.id.clone(), user.clone());
+
     let mut response = Json(json!({"user":user,"events":app.events})).into_response();
+
     if let Some(cookie) = cookie {
         response
             .headers_mut()
             .insert(header::SET_COOKIE, HeaderValue::from_str(&cookie).unwrap());
     }
+
     Ok(response)
 }
 
@@ -239,6 +259,7 @@ struct ProfileInput {
     #[serde(default)]
     favorite_track_id: Option<i64>,
 }
+
 async fn profile(
     State(app): State<Shared>,
     headers: HeaderMap,
@@ -296,9 +317,11 @@ async fn profile(
         "pink".into()
     };
     user.visible = input.visible;
+
     app.store.update_profile(&user).await?;
     inner.users.insert(user.id.clone(), user.clone());
     app.notify();
+
     Ok(Json(user))
 }
 
@@ -359,6 +382,7 @@ async fn search_music(
 struct JoinInput {
     event_id: String,
 }
+
 async fn join_event(
     State(app): State<Shared>,
     headers: HeaderMap,
@@ -366,46 +390,70 @@ async fn join_event(
 ) -> ApiResult<Json<Value>> {
     let mut inner = app.inner.lock().await;
     let mut user = authenticated(&headers, &app.store).await?;
+
     if user.name.is_empty() {
         return Err(bad("プロフィールを登録してください"));
     }
+
     if !app.store.event_exists(&input.event_id).await? {
         return Err(bad("イベントを選んでください"));
     }
+
+    if user
+        .event_id
+        .as_deref()
+        .is_some_and(|event_id| event_id != input.event_id.as_str())
+    {
+        return Err(error(
+            StatusCode::CONFLICT,
+            "参加後にイベントを変更することはできません",
+        ));
+    }
+
     app.store.join(&user.id, &input.event_id).await?;
-    if user.event_id.as_deref() != Some(&input.event_id) {
+
+    if user.event_id.as_deref() != Some(input.event_id.as_str()) {
         inner.reactions.retain(|_, r| r.user_id != user.id);
     }
+
     user.event_id = Some(input.event_id.clone());
     inner.users.insert(user.id.clone(), user);
     app.notify();
+
     Ok(Json(json!({"eventId":input.event_id})))
 }
 
 async fn settle(app: &App, inner: &mut Inner, time: u64) -> ApiResult<()> {
     let window = window_id(time);
+
     if window == inner.last_window {
         return Ok(());
     }
+
     let completed: Vec<_> = inner
         .reactions
         .values()
         .filter(|r| r.window < window)
         .cloned()
         .collect();
+
     let mut memories = Vec::new();
+
     for i in 0..completed.len() {
         for j in i + 1..completed.len() {
             let a = &completed[i];
             let b = &completed[j];
+
             if !reactions::matches(a, b) {
                 continue;
             }
+
             if !inner.users.get(&a.user_id).is_some_and(|u| u.visible)
                 || !inner.users.get(&b.user_id).is_some_and(|u| u.visible)
             {
                 continue;
             }
+
             for (me, other) in [(a, b), (b, a)] {
                 memories.push(Memory {
                     id: id(),
@@ -419,27 +467,34 @@ async fn settle(app: &App, inner: &mut Inner, time: u64) -> ApiResult<()> {
             }
         }
     }
+
     // Only discard the aggregation window after the database transaction commits.
     app.store.insert_memories(&memories).await?;
     inner.reactions.retain(|_, r| r.window >= window);
     inner.last_window = window;
     app.notify();
+
     Ok(())
 }
 
 async fn react(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Json<Value>> {
     let mut inner = app.inner.lock().await;
     let user = authenticated(&headers, &app.store).await?;
+
     let event_id = user
         .event_id
         .clone()
         .ok_or_else(|| bad("イベントに参加してください"))?;
+
     let uid = user.id.clone();
     inner.users.insert(uid.clone(), user);
+
     let time = now();
     settle(&app, &mut inner, time).await?;
+
     let window = window_id(time);
     let key = format!("{window}:{uid}");
+
     let reaction = inner.reactions.entry(key).or_insert(Reaction {
         user_id: uid,
         event_id,
@@ -447,16 +502,25 @@ async fn react(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Json<
         taps: 0,
         last_tap: 0,
     });
+
     if time.saturating_sub(reaction.last_tap) < 60 || reaction.taps >= 80 {
         return Err(error(
             StatusCode::TOO_MANY_REQUESTS,
             "少し待ってタップしてください",
         ));
     }
+
     reaction.taps += 1;
     reaction.last_tap = time;
-    let response = json!({"taps":reaction.taps,"level":strength(reaction.taps),"windowEnds":(window+1)*WINDOW_MS});
+
+    let response = json!({
+        "taps": reaction.taps,
+        "level": strength(reaction.taps),
+        "windowEnds": (window + 1) * WINDOW_MS
+    });
+
     app.notify();
+
     Ok(Json(response))
 }
 
@@ -466,8 +530,10 @@ fn snapshot(inner: &Inner, uid: &str) -> Value {
         .get(uid)
         .and_then(|u| u.event_id.as_deref())
         .unwrap_or("");
+
     let time = now();
     let window = window_id(time);
+
     let online: HashSet<_> = inner
         .clients
         .values()
@@ -479,23 +545,34 @@ fn snapshot(inner: &Inner, uid: &str) -> Value {
                 .is_some_and(|u| u.event_id.as_deref() == Some(event_id))
         })
         .collect();
+
     let mut users: Vec<_> = online.into_iter().collect();
     users.sort();
+
     let participants: Vec<_> = users
         .into_iter()
         .filter_map(|id| {
             let u = inner.users.get(id)?;
+
             let taps = inner
                 .reactions
                 .get(&format!("{window}:{id}"))
                 .map_or(0, |r| r.taps);
+
             let mut value = serde_json::to_value(u.public()).ok()?;
             value["taps"] = json!(taps);
             value["level"] = json!(strength(taps));
+
             Some(value)
         })
         .collect();
-    json!({"eventId":event_id,"serverTime":time,"count":participants.len(),"participants":participants})
+
+    json!({
+        "eventId": event_id,
+        "serverTime": time,
+        "count": participants.len(),
+        "participants": participants
+    })
 }
 
 // The guard is dropped even when a browser disconnects while the stream is waiting.
@@ -503,10 +580,12 @@ struct ConnectionGuard {
     app: Shared,
     connection_id: String,
 }
+
 impl Drop for ConnectionGuard {
     fn drop(&mut self) {
         let app = self.app.clone();
         let id = self.connection_id.clone();
+
         tokio::spawn(async move {
             app.inner.lock().await.clients.remove(&id);
             app.notify();
@@ -517,29 +596,38 @@ impl Drop for ConnectionGuard {
 async fn stream(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Response> {
     let mut inner = app.inner.lock().await;
     let user = authenticated(&headers, &app.store).await?;
+
     let uid = user.id.clone();
     inner.users.insert(uid.clone(), user);
+
     if inner.users[&uid].event_id.is_none() {
         return Err(bad("先にイベントに参加してください"));
     }
+
     let connection_id = id();
+
     inner.clients.insert(
         connection_id.clone(),
         LiveConnection {
             user_id: uid.clone(),
         },
     );
+
     let mut updates = app.updates.subscribe();
     let initial = snapshot(&inner, &uid).to_string();
+
     app.notify();
     drop(inner);
+
     let guard = ConnectionGuard {
         app: app.clone(),
         connection_id,
     };
+
     let output = async_stream::stream! {
         let _guard = guard;
         yield Ok::<_, Infallible>(Event::default().data(initial));
+
         loop {
             match updates.recv().await {
                 Ok(()) | Err(broadcast::error::RecvError::Lagged(_)) => {
@@ -550,6 +638,7 @@ async fn stream(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Resp
             }
         }
     };
+
     Ok(Sse::new(output)
         .keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
         .into_response())
@@ -559,10 +648,12 @@ async fn memories(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Js
     let user = authenticated(&headers, &app.store).await?;
     Ok(Json(app.store.memories(&user.id).await?))
 }
+
 #[derive(Deserialize)]
 struct FavoriteInput {
     favorite: bool,
 }
+
 async fn favorite(
     State(app): State<Shared>,
     headers: HeaderMap,
@@ -570,9 +661,11 @@ async fn favorite(
     Json(input): Json<FavoriteInput>,
 ) -> ApiResult<Json<Memory>> {
     let user = authenticated(&headers, &app.store).await?;
+
     if Uuid::parse_str(&memory_id).is_err() {
         return Err(error(StatusCode::NOT_FOUND, "メモリが見つかりません"));
     }
+
     app.store
         .favorite(&user.id, &memory_id, input.favorite)
         .await?
@@ -584,6 +677,7 @@ async fn static_file(State(app): State<Shared>, req: Request) -> Response {
     if req.method() != "GET" && req.method() != "HEAD" {
         return StatusCode::METHOD_NOT_ALLOWED.into_response();
     }
+
     let (file, content_type) = match req.uri().path() {
         "/" => ("index.html", "text/html; charset=utf-8"),
         "/app.js" => ("app.js", "text/javascript; charset=utf-8"),
@@ -595,6 +689,7 @@ async fn static_file(State(app): State<Shared>, req: Request) -> Response {
         "/favicon.svg" => ("favicon.svg", "image/svg+xml"),
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
+
     match tokio::fs::read(app.public_dir.join(file)).await {
         Ok(data) => ([(header::CONTENT_TYPE, content_type)], data).into_response(),
         Err(_) => (StatusCode::NOT_FOUND, "Build frontend first: npm run build").into_response(),
@@ -612,11 +707,14 @@ async fn security(req: Request, next: Next) -> Response {
             .get(header::HOST)
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
+
         if origin != format!("http://{host}") && origin != format!("https://{host}") {
             return error(StatusCode::FORBIDDEN, "同じサイトから操作してください").into_response();
         }
     }
+
     let mut response = next.run(req).await;
+
     for (key, value) in [
         ("cache-control", "no-store"),
         ("x-content-type-options", "nosniff"),
@@ -631,6 +729,7 @@ async fn security(req: Request, next: Next) -> Response {
             HeaderValue::from_static(value),
         );
     }
+
     response
 }
 
@@ -638,23 +737,30 @@ async fn security(req: Request, next: Next) -> Response {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     dotenvy::from_path(root.join(".env")).ok();
+
     let database_url = std::env::var("DATABASE_URL").map_err(
         |_| "DATABASE_URLが未設定です。.env.exampleを.envへコピーしてDBを起動してください。",
     )?;
+
     let store = Store::connect(&database_url)
         .await
         .map_err(|_| "PostgreSQLに接続できません。DBの起動とDATABASE_URLを確認してください。")?;
+
     store.migrate().await?;
+
     let args: Vec<String> = std::env::args().collect();
+
     if args.get(1).is_some_and(|arg| arg == "--import-json") {
         let source = args.get(2).ok_or("Usage: feswave --import-json <path>")?;
         let counts = store.import_json(std::path::Path::new(source)).await?;
         println!("Imported legacy JSON: {counts}");
         return Ok(());
     }
+
     let users = store.users().await?;
     let events = store.events().await?;
     let (updates, _) = broadcast::channel(128);
+
     let app = Arc::new(App {
         inner: Mutex::new(Inner {
             users,
@@ -668,17 +774,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         public_dir: root.join("public"),
         music: MusicService::new()?,
     });
+
     let ticker = app.clone();
+
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(Duration::from_millis(250));
+
         loop {
             tick.tick().await;
             let mut inner = ticker.inner.lock().await;
+
             if let Err(e) = settle(&ticker, &mut inner, now()).await {
                 eprintln!("Settlement failed: {e:?}");
             }
         }
     });
+
     let router = Router::new()
         .route("/api/session", get(session))
         .route("/api/profile", put(profile))
@@ -692,14 +803,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(DefaultBodyLimit::max(8192))
         .layer(middleware::from_fn(security))
         .with_state(app);
+
     let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".into());
     let port = std::env::var("PORT").unwrap_or_else(|_| "3000".into());
+
     let listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
     println!("FESWAVE (Rust + PostgreSQL) is ready: http://localhost:{port}");
+
     axum::serve(listener, router)
         .with_graceful_shutdown(async {
             let _ = tokio::signal::ctrl_c().await;
         })
         .await?;
+
     Ok(())
 }

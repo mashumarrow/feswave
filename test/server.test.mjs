@@ -115,6 +115,9 @@ test('PostgreSQL migration, import, real-time sharing, restart persistence and p
       assert.equal((await request('profile',cookieA,'PUT',{name:'Alice',...invalid})).response.status,400);
     }
     assert.equal((await request('session',cookieA)).data.user.tracks.length,2);
+    assert.equal((await request('join', cookieA, 'POST', { eventId: 'feswave-2026' })).response.status, 200);
+    assert.equal((await request('join', cookieA, 'POST', { eventId: 'night-groove' })).response.status, 409);
+    assert.equal((await request('session', cookieA)).data.user.eventId, 'feswave-2026');
     for (const cookie of [cookieA, cookieB]) {
       const controller = new AbortController(); streams.push(controller);
       const response = await fetch(base + 'stream', { headers: { Cookie: cookie }, signal: controller.signal });
