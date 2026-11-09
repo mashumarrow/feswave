@@ -3,9 +3,11 @@ pub const WINDOW_MS: u64 = 5_000;
 pub fn strength(taps: u32) -> u8 {
     match taps {
         0 => 0,
-        1..=2 => 1,
-        3..=5 => 2,
-        _ => 3,
+        1..=5 => 1,
+        6..=10 => 2,
+        11..=15 => 3,
+        16..=20 => 4,
+        _ => 5,
     }
 }
 
@@ -36,7 +38,10 @@ mod tests {
     use super::*;
     #[test]
     fn threshold_boundaries() {
-        assert_eq!([0, 1, 2, 3, 5, 6, 80].map(strength), [0, 1, 1, 2, 2, 3, 3]);
+        assert_eq!(
+            [0, 1, 5, 6, 10, 11, 15, 16, 20, 21, 25, 80].map(strength),
+            [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5]
+        );
     }
     #[test]
     fn fixed_windows() {
@@ -54,15 +59,15 @@ mod tests {
         };
         let mut b = Reaction {
             user_id: "b".into(),
-            taps: 3,
+            taps: 6,
             ..a.clone()
         };
         assert!(matches(&a, &b));
-        b.taps = 6;
+        b.taps = 11;
         assert!(!matches(&a, &b));
         b.taps = 0;
         assert!(!matches(&a, &b));
-        b.taps = 3;
+        b.taps = 6;
         b.window = 2;
         assert!(!matches(&a, &b));
         b.window = 1;

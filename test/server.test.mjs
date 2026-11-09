@@ -84,12 +84,31 @@ test('PostgreSQL migration, import, real-time sharing, restart persistence and p
       (async () => { try { while (!(await reader.read()).done) {} } catch {} })();
     }
     await new Promise(resolve => setTimeout(resolve, 5000 - Date.now() % 5000 + 80));
-    for (const cookie of [cookieA, cookieB]) assert.equal((await request('react', cookie, 'POST', {})).data.level, 1);
+    const thresholds = new Map([[1, 1], [5, 1], [6, 2], [10, 2], [11, 3], [15, 3], [16, 4], [20, 4], [21, 5]]);
+    for (let taps = 1; taps <= 21; taps++) {
+      const results = await Promise.all([cookieA, cookieB].map(cookie => request('react', cookie, 'POST', {})));
+      for (const { response, data } of results) {
+        assert.equal(response.status, 200);
+        assert.equal(data.taps, taps);
+        if (thresholds.has(taps)) assert.equal(data.level, thresholds.get(taps));
+      }
+      await new Promise(resolve => setTimeout(resolve, 85));
+    }
+    const levelStream = new AbortController(); streams.push(levelStream);
+    const levelResponse = await fetch(base + 'stream', { headers: { Cookie: cookieA }, signal: levelStream.signal });
+    const levelReader = levelResponse.body.getReader();
+    let levelFrame = '';
+    while (!/\r?\n\r?\n/.test(levelFrame)) levelFrame += new TextDecoder().decode((await levelReader.read()).value);
+    const snapshot = JSON.parse(levelFrame.match(/^data:\s*(.+)$/m)[1]);
+    assert.equal(snapshot.participants.find(person => person.id === a.data.user.id).level, 5);
+    assert.equal(snapshot.participants.find(person => person.id === a.data.user.id).taps, 21);
+    levelStream.abort();
     await new Promise(resolve => setTimeout(resolve, 5000 - Date.now() % 5000 + 500));
     const memoriesA = (await request('memories', cookieA)).data;
     const memoriesB = (await request('memories', cookieB)).data;
     assert.equal(memoriesA.length, 1); assert.equal(memoriesA[0].person.name, 'Bob');
     assert.equal(memoriesB.length, 1); assert.equal(memoriesB[0].person.name, 'Alice');
+    assert.equal(memoriesA[0].level, 5); assert.equal(memoriesB[0].level, 5);
     assert.ok(Date.now() - memoriesA[0].at < 6000);
     assert.equal((await request(`memories/${memoriesA[0].id}`, cookieB, 'PATCH', { favorite: true })).response.status, 404);
     assert.equal((await request(`memories/${memoriesA[0].id}`, cookieA, 'PATCH', { favorite: true })).data.favorite, true);
@@ -105,6 +124,7 @@ test('PostgreSQL migration, import, real-time sharing, restart persistence and p
     assert.equal((await request('session', cookieA)).data.user.eventId, 'feswave-2026');
     const persisted = (await request('memories', cookieA)).data;
     assert.equal(persisted.length, 1); assert.equal(persisted[0].favorite, true);
+    assert.equal(persisted[0].level, 5);
     await request('profile', cookieB, 'PUT', { name: 'Bob', artist: 'SECRET', visible: false });
     assert.equal((await request('memories', cookieA)).data.length, 0);
     assert.equal((await db.admin.query('SELECT id FROM memories WHERE person_id=$1', [b.data.user.id])).rowCount, 0);
