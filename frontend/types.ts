@@ -1,7 +1,8 @@
 export type Color = 'pink' | 'blue' | 'purple' | 'orange';
 export type Page = 'live' | 'memory' | 'profile';
-export interface PublicUser { id: string; name: string; artist: string; song: string; color: Color }
-export interface User extends PublicUser { visible: boolean; eventId: string | null }
+export interface MusicTrack { trackId: number; artistName: string; trackName: string; collectionName: string; artworkUrl: string | null; trackUrl: string }
+export interface PublicUser { id: string; name: string; artist: string; song: string; color: Color; music?: MusicTrack | null; tracks?: MusicTrack[] }
+export interface User extends PublicUser { visible: boolean; eventId: string | null; favoriteTrackId: number | null }
 export interface Participant extends PublicUser { taps?: number; level: number }
 export interface LiveEvent { id: string; name: string; subtitle: string; date: string; venue: string; artist: string; song: string; time: string; color: Color }
 export interface Memory { id: string; userId: string; eventId: string; at: number; level: number; person: PublicUser; favorite: boolean }
