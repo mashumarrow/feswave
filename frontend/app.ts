@@ -278,8 +278,18 @@ function renderBubbles() {
 }
 function renderMeter() {
   $("#your-level").textContent = `LEVEL ${state.level}`;
+  $("#your-level").dataset.level = String(state.level);
+  $("#orb").dataset.level = String(state.level);
+  const messages = [
+    "",
+    "いい感じ！",
+    "気持ちが重なる",
+    "盛り上がってきた！",
+    "最高の瞬間！",
+    "最高潮！",
+  ];
   $("#tap-count").textContent = state.taps
-    ? `${state.taps} taps · ${["", "いい感じ！", "気持ちが重なる", "最高の瞬間！"][state.level]}`
+    ? `${state.taps} taps · ${messages[state.level] ?? ""}`
     : "タップして、盛り上がりをシェア";
   $$(".level-bars i").forEach((el, i) =>
     el.classList.toggle("lit", i < state.level),
@@ -295,7 +305,7 @@ async function react() {
   orb.classList.add("pulse");
   if (state.demo) {
     state.taps++;
-    state.level = state.taps >= 6 ? 3 : state.taps >= 3 ? 2 : 1;
+    state.level = Math.min(5, Math.ceil(state.taps / 5));
     state.windowEnds = (Math.floor(Date.now() / 5000) + 1) * 5000;
     renderMeter();
     renderBubbles();
@@ -438,7 +448,7 @@ function personProfile(id: string) {
 }
 function about() {
   openModal(
-    `<div class="modal-inner">${closeButton}<svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">FEEL THE SAME WAVE.</div><h2>音楽でつながる、<br>もっと近くに。</h2><div class="about-text"><p>FESWAVEは、ライブの感動を言葉を使わずに共有するアプリです。<strong>その瞬間の気持ちをタップ</strong>して届けましょう。</p><p>5秒間に1〜2タップでLevel 1、3〜5タップでLevel 2、6タップ以上でLevel 3。同じイベント・同じ時間帯でレベル差が1以内なら共感候補になります。</p><p>双方がプロフィールの共有を許可すると、5秒の集計後にメモリが保存されます。共有をオフにすると、相手の履歴からあなたの記録も削除されます。</p><p>デモ参加者はサンプル表示です。実際の参加者はイベント参加後に表示されます。</p><p>v0.2 ローカルMVP · Bluetooth、Spotify、位置推定、アカウント認証は未実装です。サーバー側に履歴を保存し、Cookieで端末を識別します。</p></div><button class="primary-btn full-width" data-action="close">LET'S FEEL THE WAVE ${icon("arrow")}</button></div>`,
+    `<div class="modal-inner">${closeButton}<svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">FEEL THE SAME WAVE.</div><h2>音楽でつながる、<br>もっと近くに。</h2><div class="about-text"><p>FESWAVEは、ライブの感動を言葉を使わずに共有するアプリです。<strong>その瞬間の気持ちをタップ</strong>して届けましょう。</p><p>5秒間に1〜5タップでLevel 1、6〜10タップでLevel 2、11〜15タップでLevel 3、16〜20タップでLevel 4、21タップ以上でLevel 5。同じイベント・同じ時間帯でレベル差が1以内なら共感候補になります。</p><p>双方がプロフィールの共有を許可すると、5秒の集計後にメモリが保存されます。共有をオフにすると、相手の履歴からあなたの記録も削除されます。</p><p>デモ参加者はサンプル表示です。実際の参加者はイベント参加後に表示されます。</p><p>v0.2 ローカルMVP · Bluetooth、Spotify、位置推定、アカウント認証は未実装です。サーバー側に履歴を保存し、Cookieで端末を識別します。</p></div><button class="primary-btn full-width" data-action="close">LET'S FEEL THE WAVE ${icon("arrow")}</button></div>`,
   );
 }
 document.addEventListener("click", async (event) => {
@@ -572,6 +582,7 @@ setInterval(() => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && !state.demo) refreshMemories();
 });
+renderMeter();
 renderBubbles();
 renderProfile();
 renderMemories();

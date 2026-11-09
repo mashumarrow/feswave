@@ -26,13 +26,24 @@ h1 { font-size: 30px; }
 .reaction-controls { padding: 12px 20px 16px; }
 .tap-button { min-height: 64px; touch-action: manipulation; }
 .reaction-orb { touch-action: manipulation; }
+.reaction-orb[data-level], #your-level[data-level] { --reaction-color: #a198af; color: var(--reaction-color); }
+.reaction-orb[data-level="1"], #your-level[data-level="1"], .legend-dot.level-1, .level-bars i:nth-child(1) { --reaction-color: #37d5f7; }
+.reaction-orb[data-level="2"], #your-level[data-level="2"], .legend-dot.level-2, .level-bars i:nth-child(2) { --reaction-color: #5a9cff; }
+.reaction-orb[data-level="3"], #your-level[data-level="3"], .legend-dot.level-3, .level-bars i:nth-child(3) { --reaction-color: #aa75ff; }
+.reaction-orb[data-level="4"], #your-level[data-level="4"], .legend-dot.level-4, .level-bars i:nth-child(4) { --reaction-color: #f14be5; }
+.reaction-orb[data-level="5"], #your-level[data-level="5"], .legend-dot.level-5, .level-bars i:nth-child(5) { --reaction-color: #ffad66; }
+.reaction-orb[data-level] { border-color: var(--reaction-color); }
+.reaction-orb[data-level] .orb-inner svg { filter: drop-shadow(0 0 6px currentColor); }
+.reaction-orb[data-level].pulse { box-shadow: 0 0 0 22px #b752f11c, 0 0 65px var(--reaction-color); }
+.level-bars i.lit:nth-child(n) { background: var(--reaction-color); box-shadow: 0 0 6px var(--reaction-color); }
+.panel-footer .legend-dot { background: var(--reaction-color); }
 .tap-button small { font-size: 9px; }
 .reaction-meter { font-size: 9px; gap: 7px; }
 .reaction-meter > span:last-child { font-size: 8px; }
 .tap-key { display: none; }
-.panel-footer { gap: 16px; margin-inline: 18px; }
-.panel-footer > span { font-size: 8px; }
-.panel-footer small { font-size: 7px; }
+.panel-footer { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin-inline: 18px; }
+.panel-footer > span { flex-direction: column; gap: 5px; font-size: 8px; }
+.panel-footer small { font-size: 7px; margin-left: 0; }
 .live-right { gap: 12px; }
 .section-kicker { font-size: 7px; }
 .moment-card p { font-size: 10px; }

@@ -1,3 +1,4 @@
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -348,11 +349,50 @@ test(
       await new Promise((resolve) =>
         setTimeout(resolve, 5000 - (Date.now() % 5000) + 80),
       );
-      for (const cookie of [cookieA, cookieB])
-        assert.equal(
-          (await request("react", cookie, "POST", {})).data.level,
-          1,
+      // Verify the Rust server's five reaction levels at every boundary.
+      const thresholds = new Map([
+        [1, 1], [5, 1], [6, 2], [10, 2],
+        [11, 3], [15, 3], [16, 4], [20, 4], [21, 5],
+      ]);
+      for (let taps = 1; taps <= 21; taps++) {
+        const results = await Promise.all(
+          [cookieA, cookieB].map((cookie) =>
+            request("react", cookie, "POST", {}),
+          ),
         );
+        for (const { response, data } of results) {
+          assert.equal(response.status, 200);
+          assert.equal(data.taps, taps);
+          if (thresholds.has(taps)) {
+            assert.equal(data.level, thresholds.get(taps));
+          }
+        }
+        // Respect the server's minimum interval between taps.
+        await new Promise((resolve) => setTimeout(resolve, 85));
+      }
+
+      // Verify that the live stream exposes the same server-computed level.
+      const levelStream = new AbortController();
+      streams.push(levelStream);
+      const levelResponse = await fetch(base + "stream", {
+        headers: { Cookie: cookieA },
+        signal: levelStream.signal,
+      });
+      assert.equal(levelResponse.status, 200);
+      const levelReader = levelResponse.body.getReader();
+      let levelFrame = "";
+      while (!/\r?\n\r?\n/.test(levelFrame)) {
+        const { done, value } = await levelReader.read();
+        assert.equal(done, false);
+        levelFrame += new TextDecoder().decode(value);
+      }
+      const snapshot = JSON.parse(levelFrame.match(/^data:\s*(.+)$/m)[1]);
+      const participant = snapshot.participants.find(
+        (person) => person.id === a.data.user.id,
+      );
+      assert.equal(participant.level, 5);
+      assert.equal(participant.taps, 21);
+      levelStream.abort();
       await new Promise((resolve) =>
         setTimeout(resolve, 5000 - (Date.now() % 5000) + 500),
       );
@@ -361,7 +401,8 @@ test(
       assert.equal(memoriesA.length, 1);
       assert.equal(memoriesA[0].person.name, "Bob");
       assert.equal(memoriesB.length, 1);
-      assert.equal(memoriesB[0].person.name, "Alice");
+      assert.equal(memories[0].level, 5);
+      assert.equal(memoriesB[0].level, 5);
       assert.equal(memoriesA[0].person.music.collectionName, "Catalog Album");
       assert.equal(memoriesA[0].person.tracks.length, 2);
       assert.ok(Date.now() - memoriesA[0].at < 6000);
@@ -417,6 +458,7 @@ test(
       const persisted = (await request("memories", cookieA)).data;
       assert.equal(persisted.length, 1);
       assert.equal(persisted[0].favorite, true);
+      assert.equal(persisted[0].level, 5);
       await request("profile", cookieB, "PUT", {
         name: "Bob",
         trackId: 123,
