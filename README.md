@@ -1,10 +1,18 @@
 # FESWAVE
 
-![FESWAVE](apps/feswave_android/assets/feswave.svg)
+<p align="center">
+  <img src="apps/feswave_android/assets/feswave.svg" alt="FESWAVE" width="268">
+</p>
+
+<p align="center">
+  <a href="https://github.com/mashumarrow/feswave/releases/download/v0.1.0/feswave-demo-arm64.apk"><img src="https://img.shields.io/badge/Android%2012%2B-Demo%20APK-72cabe?logo=android" alt="Android 12以上向けデモAPKをダウンロード"></a>
+  <a href="https://github.com/mashumarrow/feswave/actions/workflows/android.yml"><img src="https://img.shields.io/badge/Actions-APK%20build-586579?logo=githubactions" alt="デモAPKのビルド履歴"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-c77d99" alt="MITライセンス"></a>
+</p>
 
 FESWAVEは、ライブ会場で近くの人が好きな曲を知るためのAndroidアプリです。同じ5秒間に近くの人と同じくらい画面をタップすると、お互いに公開している曲を「共感メモリ」として端末に記録できます。
 
-[デモAPKをダウンロード](https://github.com/mashumarrow/feswave/releases/download/v0.1.0/feswave-demo-arm64.apk) · [リリース一覧](https://github.com/mashumarrow/feswave/releases) · [MITライセンス](LICENSE)
+[デモAPKをダウンロード](https://github.com/mashumarrow/feswave/releases/download/v0.1.0/feswave-demo-arm64.apk) · [リリース一覧](https://github.com/mashumarrow/feswave/releases)
 
 ## アプリでできること
 
