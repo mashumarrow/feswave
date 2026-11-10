@@ -7,7 +7,7 @@ import '../ui/shared.dart';
 
 Offset orbitPoint(Size size, double phase, double proximity, double angle) {
   final extent = size.shortestSide;
-  final radius = lerpDouble(extent * .39, extent * .22, proximity)!;
+  final radius = lerpDouble(math.min(142.0, extent / 2 - 32), 84, proximity)!;
   return size.center(Offset.zero) +
       Offset(
             math.cos(angle + phase * 2 * math.pi),
@@ -21,23 +21,22 @@ class OrbitGrid extends CustomPainter {
   const OrbitGrid(this.level);
   @override
   void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero), extent = size.shortestSide;
+    final c = size.center(Offset.zero);
     final stroke = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
-    for (final r in [.22, .305, .39]) {
-      stroke.color = lilac.withValues(alpha: .16);
-      canvas.drawCircle(c, extent * r, stroke);
+    for (final radius in [68.0, 95.0]) {
+      stroke.color = const Color(0x379b5abb);
+      canvas.drawCircle(c, radius, stroke);
     }
-    for (int i = 0; i < 60; i++) {
-      final a = i * math.pi / 30, d = Offset(math.cos(a), math.sin(a));
-      stroke.color = lilac.withValues(alpha: i % 5 == 0 ? 0.5 : 0.19);
-      canvas.drawLine(
-        c + d * extent * .447,
-        c + d * (extent * .447 + (i % 5 == 0 ? 5 : 2)),
-        stroke,
-      );
+    stroke.color = const Color(0x38785f9c);
+    final outer = Rect.fromCircle(center: c, radius: 115);
+    for (int i = 0; i < 144; i++) {
+      canvas.drawArc(outer, i * math.pi / 72, .023, false, stroke);
     }
+    stroke.color = const Color(0x089b6dc3);
+    canvas.drawLine(c - const Offset(149, 0), c + const Offset(149, 0), stroke);
+    canvas.drawLine(c - const Offset(0, 149), c + const Offset(0, 149), stroke);
   }
 
   @override

@@ -16,55 +16,108 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
   bool favorites = false;
   @override
   Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 22),
     children: [
       const PageHeading(
         'THE MOMENTS WE SHARED.',
         'Memory',
-        Icons.favorite_border,
+        'heart',
         'あの瞬間、同じ気持ちだった誰か。',
       ),
       WavePanel(
+        padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 23),
         children: [
           const Row(
             children: [
-              Icon(Icons.favorite_border, size: 36, color: pink),
-              SizedBox(width: 12),
+              WaveIcon('heart', size: 38, color: Color(0xfff087ec)),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('YOUR SHARED MOMENTS', style: captionStyle),
-                    Text('音が止まっても、つながりは残る。'),
+                    Text(
+                      'YOUR SHARED MOMENTS',
+                      style: TextStyle(
+                        fontSize: 8,
+                        letterSpacing: 1,
+                        color: Color(0xffa397b6),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      '音が止まっても、つながりは残る。',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      '近くで同じ5秒間に盛り上がった参加者との記録です。',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.8,
+                        color: Color(0xff9783a7),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text('近くで同じ5秒間に盛り上がった参加者との記録です。', style: noteStyle),
-          const Divider(),
-          Text(
-            '${ref.watch(historyProvider).value?.length ?? "—"}   MEMORIES',
-            textAlign: TextAlign.center,
-            style: captionStyle,
+          const Divider(height: 30),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '${ref.watch(historyProvider).value?.length ?? "—"}',
+                style: const TextStyle(fontSize: 32, color: Color(0xffedbbfa)),
+              ),
+              const SizedBox(width: 12),
+              const Text('MEMORIES', style: captionStyle),
+            ],
           ),
         ],
       ),
-      const SizedBox(height: 14),
+      const SizedBox(height: 8),
       Wrap(
-        spacing: 8,
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          for (final only in [false, true])
-            ChoiceChip(
-              label: Text(only ? 'お気に入り' : 'すべて'),
-              selected: favorites == only,
-              onSelected: (_) => setState(() => favorites = only),
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final only in [false, true])
+                TextButton(
+                  onPressed: () => setState(() => favorites = only),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(48, 44),
+                    backgroundColor: favorites == only
+                        ? const Color(0xff24132d)
+                        : Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      side: BorderSide(
+                        color: favorites == only
+                            ? const Color(0xff783d8a)
+                            : Colors.transparent,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    only ? '♡ お気に入り' : 'すべて',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ),
+            ],
+          ),
+          const Text(
+            '公開を許可した参加者のみ表示',
+            style: TextStyle(fontSize: 10, color: Color(0xffa594b2)),
+          ),
         ],
       ),
-      const Text('公開を許可した参加者のみ表示', style: noteStyle),
-      const SizedBox(height: 12),
+      const SizedBox(height: 22),
       ...ref
           .watch(historyProvider)
           .when(
@@ -74,6 +127,10 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
                 return [
                   WavePanel(
                     center: true,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 17,
+                      vertical: 40,
+                    ),
                     children: [
                       const Icon(Icons.favorite_border, color: lilac, size: 32),
                       const SizedBox(height: 10),

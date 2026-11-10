@@ -35,15 +35,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       data: (a) {
         final controller = ref.read(accountProvider.notifier);
         return ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 22),
           children: [
             const PageHeading(
               'YOUR MUSIC. YOUR IDENTITY.',
               'Profile',
-              Icons.person_outline,
+              'user',
               'あなたの「好き」が、つながりのきっかけに。',
             ),
             WavePanel(
+              padding: const EdgeInsets.all(22),
               children: [
                 const Text('ACCOUNT', style: captionStyle),
                 const SizedBox(height: 8),
@@ -67,10 +68,25 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   style: a.linked
                       ? null
                       : OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          shape: const StadiumBorder(),
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.black87,
                         ),
-                  child: Text(a.linked ? 'ログアウト' : 'Googleでログイン'),
+                  child: a.linked
+                      ? const Text('ログアウト')
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Image.asset(
+                              'assets/google-g.png',
+                              width: 20,
+                              height: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            const Text('Googleでログイン'),
+                          ],
+                        ),
                 ),
               ],
             ),
