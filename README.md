@@ -1,18 +1,21 @@
 # FESWAVE
 
 <p align="center">
-  <img src="apps/feswave_android/assets/feswave.svg" alt="FESWAVE" width="268">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="apps/feswave_android/assets/feswave.svg">
+    <img alt="FESWAVE" src="apps/feswave_android/assets/feswave-light.svg" width="268" height="60">
+  </picture>
 </p>
 
 <p align="center">
-  <a href="https://github.com/mashumarrow/feswave/releases/download/v0.1.0/feswave-demo-arm64.apk"><img src="https://img.shields.io/badge/Android%2012%2B-Demo%20APK-72cabe?logo=android" alt="Android 12以上向けデモAPKをダウンロード"></a>
-  <a href="https://github.com/mashumarrow/feswave/actions/workflows/android.yml"><img src="https://img.shields.io/badge/Actions-APK%20build-586579?logo=githubactions" alt="デモAPKのビルド履歴"></a>
+  <a href="https://github.com/mashumarrow/feswave/releases/latest/download/feswave-android-arm64.apk"><img src="https://img.shields.io/badge/Android%2012%2B-APK-72cabe?logo=android" alt="Android 12以上向け最新版APKをダウンロード"></a>
+  <a href="https://github.com/mashumarrow/feswave/actions/workflows/android.yml"><img src="https://img.shields.io/badge/Actions-APK%20build-586579?logo=githubactions" alt="Androidのビルド履歴"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-c77d99" alt="MITライセンス"></a>
 </p>
 
 FESWAVEは、ライブ会場で近くの人が好きな曲を知るためのAndroidアプリです。同じ5秒間に近くの人と同じくらい画面をタップすると、お互いに公開している曲を「共感メモリ」として端末に記録できます。
 
-[デモAPKをダウンロード](https://github.com/mashumarrow/feswave/releases/download/v0.1.0/feswave-demo-arm64.apk) · [リリース一覧](https://github.com/mashumarrow/feswave/releases)
+[最新版APKをダウンロード](https://github.com/mashumarrow/feswave/releases/latest/download/feswave-android-arm64.apk) · [リリース一覧](https://github.com/mashumarrow/feswave/releases)
 
 ## アプリでできること
 
@@ -24,10 +27,10 @@ FESWAVEは、ライブ会場で近くの人が好きな曲を知るためのAndr
 
 ## 2台で試す
 
-デモAPKはarm64用のデバッグビルドです。Android 12以上で、Bluetooth LE（BLE）の広告とスキャンに対応するスマホを2台用意します。ライブと共感メモリは、ゲストのままサーバーなしで試せます。
+配布APKはarm64用の署名付きリリースビルドです。Android 12以上で、Bluetooth LE（BLE）の広告とスキャンに対応するスマホを2台用意します。ライブと共感メモリは、ゲストのままサーバーなしで試せます。
 
 1. 両方の端末にAPKをインストールし、Bluetooth・位置情報・自動日時設定をオンにします。
-2. それぞれの端末でプロフィールを編集し、ニックネームを入力します。初めて曲を登録するときは、アーティスト名と曲名を手入力できます。デモAPKでインターネットに接続していれば、曲を検索して追加することもできます。
+2. それぞれの端末でプロフィールを編集し、ニックネームを入力します。初めて曲を登録するときは、アーティスト名と曲名を手入力できます。配布APKでインターネットに接続していれば、曲を検索して追加することもできます。
 3. 両方の端末で「好きな曲とアイコンを公開」をオンにし、「変更を保存」を押します。
 4. 「ライブを始める」を押し、付近のデバイスと正確な位置情報の権限を許可します。2台を近くに置き、ライブ画面に相手が現れるまで待ちます。
 5. 2台でライブ画面を同じタイミングでタップします。近接とリアクションの条件を満たすと、受信した端末の「メモリ」で記録を見返せます。
@@ -85,7 +88,7 @@ curl -i http://127.0.0.1:3000/api/health
 
 ソースから起動した場合の既定のAPI接続先は `http://127.0.0.1:3000/api/` です。USB接続では別のターミナルから端末ごとに `adb -s DEVICE_ID reverse tcp:3000 tcp:3000` を実行します。別のサーバーに接続する場合は、ビルド時に `--dart-define=API_BASE_URL=https://your-host/api/` を指定します。
 
-Googleログインを使う場合は、アプリID `jp.feswave.feswave_android` とAPK署名のSHA-1に対応するAndroid OAuthクライアントを登録し、同じGoogle CloudプロジェクトのWebクライアントIDをAPIの `GOOGLE_CLIENT_ID` に設定します。HTTPSで公開する場合は `COOKIE_SECURE=true` を設定し、APKには配布用の署名を設定してください。
+Googleログインを使う場合は、アプリID `jp.feswave.feswave_android` とAPK署名のSHA-1に対応するAndroid OAuthクライアントを登録し、同じGoogle CloudプロジェクトのWebクライアントIDをAPIの `GOOGLE_CLIENT_ID` に設定します。HTTPSで公開する場合は `COOKIE_SECURE=true` を設定してください。
 
 配布用APKは東京リージョンのCloud Run上のAPIを使用します。[本番構成とデプロイ手順](infra/README.md)
 
