@@ -2,8 +2,7 @@ name: Build demo APK
 
 on:
   push:
-    branches: ['**']
-    tags: ['v*']
+    branches-ignore: [main]
     paths:
       - 'apps/feswave_android/**'
       - '!apps/feswave_android/**/*.md'
@@ -44,31 +43,3 @@ jobs:
           name: feswave-demo-arm64
           path: apps/feswave_android/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: feswave-demo-arm64
-      - name: Publish demo APK to GitHub Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          mv app-debug.apk feswave-demo-arm64.apk
-          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
-            tag="$GITHUB_REF_NAME"
-          else
-            tag="android-demo-$GITHUB_RUN_ID"
-          fi
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" feswave-demo-arm64.apk --clobber
-          else
-            gh release create "$tag" feswave-demo-arm64.apk \
-              --target "$GITHUB_SHA" --title "Android demo · $tag" \
-              --notes "arm64 debug APK · ${GITHUB_SHA:0:12}" --prerelease
-          fi

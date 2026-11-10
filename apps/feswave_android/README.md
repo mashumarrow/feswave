@@ -18,9 +18,13 @@ mise exec -- flutter run -d DEVICE_ID
 
 Freezed・Driftのモデル定義を変更したときは `mise exec -- dart run build_runner build` を実行し、生成差分もコミットする。静的解析は `mise exec -- flutter analyze`、BLE判定やメモリ保存のテストは `mise exec -- flutter test test/live_test.dart` で個別に実行できる。
 
-Androidアプリやビルド設定を変更してブランチにpushすると、GitHub Actions の「Build demo APK」がarm64のデバッグAPKを自動ビルドする。各実行のArtifactsから `feswave-demo-arm64` をダウンロードできる。ドキュメント・テスト・検証記録・開発用ツールだけの変更は対象外。
+## 配布
 
-対象ブランチへのpushまたは手動実行でビルドが成功すると、GitHub Releasesに実行ごとのプレリリースを作り、`feswave-demo-arm64.apk` を添付する。どのブランチでも利用できる。`v*` タグのpushではそのタグを使い、同じ実行を再試行すると既存ReleaseのAPKを更新する。
+`main` へのアプリ・配布設定の変更で「Release Android」が動く。直前の `vX.Y.Z` 以降のAndroid関連コミットをgit-cliffで集計し、破壊的変更はmajor、`feat` はminor、それ以外はpatchを上げる。手動実行でも公開済みのコミットはスキップする。機能ブランチはActionsのArtifactsでデバッグAPKを配布する。
+
+正式版はタグのバージョンをAndroidの `versionName`、コミットの累計数を `versionCode` に使う。テスト後、署名付きarm64 APKとSHA-256をGitHub Releaseに添付し、変更履歴とともにLatestに指定する。検証は両ファイルを同じディレクトリに置いて `sha256sum -c feswave-android-arm64.apk.sha256` を実行する。
+
+署名にはActionsのSecrets `ANDROID_RELEASE_KEYSTORE`（PKCS12のBase64、aliasは `feswave`）と `ANDROID_RELEASE_PASSWORD` を使う。今後の上書き更新には同じ鍵が必要。以前のデバッグ署名APKから移行する場合、署名の違いにより上書きできず、アンインストールすると端末内のメモリも削除される。
 
 ローカルでビルドする場合は次を実行する。
 
