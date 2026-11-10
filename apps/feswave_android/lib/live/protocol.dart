@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import '../profile/models.dart';
 
@@ -102,5 +103,19 @@ class Nearby {
         samples.any((s) => s.time ~/ slotMs == slot);
   }
 
-  double get proximity => (((shown ?? -85) + 85) / 20).clamp(0, 1);
+  int _latestSlot = -1;
+  int? reactionAt;
+  bool acceptReaction(Signal signal, int time) {
+    if (signal.slot <= _latestSlot) return false;
+    _latestSlot = signal.slot;
+    level = signal.level;
+    reactionAt = level > 0 ? time : null;
+    return level > 0;
+  }
+
+  // Approximate path loss fitted to the 1 m and 3 m handheld RSSI fixtures.
+  double get distanceMeters {
+    final rssi = shown ?? (samples.isEmpty ? -85 : samples.last.rssi);
+    return math.pow(10, (-65.5 - rssi) / 27.25).toDouble();
+  }
 }

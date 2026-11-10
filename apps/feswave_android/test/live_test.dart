@@ -71,6 +71,12 @@ void main() {
       )).observe(int.parse(c[2]), int.parse(c[3]));
     }
     final medians = readings.map((k, p) => MapEntry(k, p.medianAt(p.last)));
+    final meanOne = Nearby(0)
+      ..shown = (medians['redmi/1']! + medians['pixel4/1']!) / 2;
+    final meanThree = Nearby(0)
+      ..shown = (medians['redmi/3']! + medians['pixel4/3']!) / 2;
+    expect(meanOne.distanceMeters, closeTo(1, .01));
+    expect(meanThree.distanceMeters, closeTo(3, .01));
     expect(medians, {
       'redmi/1': -63,
       'redmi/3': -75,

@@ -38,7 +38,9 @@ class _LivePageState extends ConsumerState<LivePage>
   final game = ResonanceGame();
   late final StreamSubscription<int> flashes;
   final demoGauge = ReactionGauge();
-  Timer? demoTick, memoryBannerTimer;
+  Timer? demoTick, demoReactions, memoryBannerTimer;
+  int demoPeer = 0;
+  int? demoReactionAt;
   String? memoryPartner;
   static final demo = [
     (
@@ -90,6 +92,15 @@ class _LivePageState extends ConsumerState<LivePage>
         if (mounted) ref.read(liveProvider.notifier).check(request: false);
       });
     }
+    if (widget.demoCount > 0) {
+      demoReactions = Timer.periodic(const Duration(seconds: 3), (_) {
+        if (!TickerMode.valuesOf(context).enabled) return;
+        setState(() {
+          demoPeer = demoPeer % widget.demoCount.clamp(1, demo.length) + 1;
+          demoReactionAt = ref.read(liveProvider.notifier).now;
+        });
+      });
+    }
     flashes = ref.read(liveProvider.notifier).effects.stream.listen((id) {
       if (!mounted || !TickerMode.valuesOf(context).enabled) return;
       if (MediaQuery.disableAnimationsOf(context)) {
@@ -114,6 +125,7 @@ class _LivePageState extends ConsumerState<LivePage>
   void dispose() {
     memoryBannerTimer?.cancel();
     demoTick?.cancel();
+    demoReactions?.cancel();
     flashes.cancel();
     pulse.dispose();
     _orbit?.dispose();
@@ -149,20 +161,30 @@ class _LivePageState extends ConsumerState<LivePage>
       );
     }
     final people = session.people.values.toList()
-      ..sort((a, b) => b.proximity.compareTo(a.proximity));
-    final items = <({int id, Profile profile, double near, int level})>[
-      if (benchmark)
-        for (int i = 0; i < widget.demoCount.clamp(0, demo.length); i++)
-          (id: i + 1, profile: demo[i].$1, near: demo[i].$2, level: demo[i].$3)
-      else
-        for (final p in people.take(10))
-          (
-            id: p.id,
-            profile: p.profile ?? Profile(name: hexId(p.id)),
-            near: p.proximity,
-            level: p.level,
-          ),
-    ];
+      ..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+    final items =
+        <
+          ({int id, Profile profile, double meters, int level, int? reactionAt})
+        >[
+          if (benchmark)
+            for (int i = 0; i < widget.demoCount.clamp(0, demo.length); i++)
+              (
+                id: i + 1,
+                profile: demo[i].$1,
+                meters: 3 - 2 * demo[i].$2,
+                level: demo[i].$3,
+                reactionAt: i + 1 == demoPeer ? demoReactionAt : null,
+              )
+          else
+            for (final p in people.take(10))
+              (
+                id: p.id,
+                profile: p.profile ?? Profile(name: hexId(p.id)),
+                meters: p.distanceMeters.clamp(1.0, 3.0),
+                reactionAt: p.reactionAt,
+                level: p.level,
+              ),
+        ];
     final reduced = MediaQuery.disableAnimationsOf(context);
     final gauge = benchmark ? demoGauge : session.gauge;
     final level = gauge.levelAt(session.now);
@@ -270,6 +292,15 @@ class _LivePageState extends ConsumerState<LivePage>
                   ),
                 ),
               ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: DistanceRings(MediaQuery.textScalerOf(context)),
+                    ),
+                  ),
+                ),
+              ),
               IgnorePointer(
                 child: AnimatedBuilder(
                   animation: pulse,
@@ -318,12 +349,13 @@ class _LivePageState extends ConsumerState<LivePage>
               for (final item in items)
                 TweenAnimationBuilder<double>(
                   key: ValueKey(item.id),
-                  tween: Tween(end: item.near),
+                  tween: Tween(end: item.meters),
                   duration: reduced
                       ? Duration.zero
                       : const Duration(milliseconds: 1200),
-                  builder: (context, near, _) {
-                    final diameter = 34 + near * 17;
+                  builder: (context, meters, _) {
+                    final diameter = 34 + (3 - meters) * 8.5;
+                    final elapsed = session.now - (item.reactionAt ?? 0);
                     return AnimatedBuilder(
                       animation: orbit,
                       builder: (context, child) {
@@ -333,7 +365,7 @@ class _LivePageState extends ConsumerState<LivePage>
                         final point = orbitPoint(
                           area,
                           reduced ? 0 : orbit.value,
-                          near,
+                          meters,
                           angle,
                         );
                         game.points[item.id] = point;
@@ -383,6 +415,14 @@ class _LivePageState extends ConsumerState<LivePage>
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
+                                    SizedBox(
+                                      height:
+                                          5 +
+                                          MediaQuery.textScalerOf(
+                                                context,
+                                              ).scale(9) *
+                                              1.4,
+                                    ),
                                     DecoratedBox(
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
@@ -396,14 +436,45 @@ class _LivePageState extends ConsumerState<LivePage>
                                             ),
                                         ],
                                       ),
-                                      child: Avatar(
-                                        item.profile,
-                                        size: diameter,
+                                      child: TweenAnimationBuilder<double>(
+                                        key: ValueKey(item.reactionAt),
+                                        tween: Tween(
+                                          begin: reduced
+                                              ? 1.0
+                                              : (elapsed / 1100).clamp(
+                                                  0.0,
+                                                  1.0,
+                                                ),
+                                          end: 1.0,
+                                        ),
+                                        duration: Duration(
+                                          milliseconds: reduced
+                                              ? 0
+                                              : (1100 - elapsed).clamp(0, 1100),
+                                        ),
+                                        builder: (_, t, child) => CustomPaint(
+                                          painter: t < 1 && !reduced
+                                              ? PeerRipple(
+                                                  t,
+                                                  tint(item.profile.color),
+                                                  item.level,
+                                                )
+                                              : null,
+                                          child: child,
+                                        ),
+                                        child: Avatar(
+                                          item.profile,
+                                          size: diameter,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(height: 5),
                                     SizedBox(
-                                      width: 78,
+                                      width: math.min(
+                                        78.0,
+                                        area.width -
+                                            2 * orbitRadius(area, meters),
+                                      ),
                                       child: Text(
                                         !benchmark
                                             ? item.profile.name
@@ -411,7 +482,10 @@ class _LivePageState extends ConsumerState<LivePage>
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         textAlign: TextAlign.center,
-                                        style: const TextStyle(fontSize: 9),
+                                        style: const TextStyle(
+                                          fontSize: 9,
+                                          height: 1.4,
+                                        ),
                                       ),
                                     ),
                                   ],

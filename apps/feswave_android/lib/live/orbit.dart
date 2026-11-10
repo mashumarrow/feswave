@@ -4,17 +4,101 @@ import 'package:flame/particles.dart';
 import '../ui/stage.dart';
 
 import 'package:flame/game.dart';
-import 'package:flutter/material.dart' show Colors;
+import 'package:flutter/material.dart'
+    show
+        Colors,
+        CustomPainter,
+        TextPainter,
+        TextSpan,
+        TextStyle,
+        Shadow,
+        TextScaler;
 
-Offset orbitPoint(Size size, double phase, double proximity, double angle) {
-  final extent = size.shortestSide;
-  final radius = lerpDouble(math.min(142.0, extent / 2 - 32), 84, proximity)!;
-  return size.center(Offset.zero) +
-      Offset(
-            math.cos(angle + phase * 2 * math.pi),
-            math.sin(angle + phase * 2 * math.pi),
-          ) *
-          radius;
+double orbitRadius(Size size, double meters) {
+  final outer = math.max(0.0, size.shortestSide / 2 - 28);
+  final inner = math.min(64.0, outer * .40);
+  return lerpDouble(inner, outer, (meters.clamp(1.0, 3.0) - 1) / 2)!;
+}
+
+Offset orbitPoint(Size size, double phase, double meters, double angle) =>
+    size.center(Offset.zero) +
+    Offset.fromDirection(
+      angle + phase * 2 * math.pi,
+      orbitRadius(size, meters),
+    );
+
+class DistanceRings extends CustomPainter {
+  const DistanceRings(this.scaler);
+  final TextScaler scaler;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final line = Paint()
+      ..color = pearl.withValues(alpha: .18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .75;
+    for (var meters = 1; meters <= 3; meters++) {
+      final r = orbitRadius(size, meters.toDouble());
+      canvas.drawCircle(center, r, line);
+      final label = TextPainter(
+        text: TextSpan(
+          text: '$meters m',
+          style: TextStyle(
+            color: pearl.withValues(alpha: .74),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            shadows: const [Shadow(color: stageNight, blurRadius: 4)],
+          ),
+        ),
+        textScaler: scaler,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      label.paint(canvas, center + Offset(-label.width / 2, -r - label.height));
+      label.dispose();
+    }
+  }
+
+  @override
+  bool shouldRepaint(DistanceRings old) => scaler != old.scaler;
+}
+
+class PeerRipple extends CustomPainter {
+  PeerRipple(this.t, this.color, this.level);
+  final double t;
+  final Color color;
+  final int level;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    for (final delay in [0.0, .18]) {
+      final phase = (t - delay) / (1 - delay);
+      if (phase < 0 || phase >= 1) continue;
+      final fade = 1 - phase;
+      final radius = size.width / 2 + (1 - fade * fade) * (22 + level * 7);
+      final ring = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1 + 3 * fade
+        ..color = Color.lerp(color, pearl, fade * .7)!.withValues(alpha: fade);
+      canvas.drawCircle(center, radius, ring);
+      if (delay == 0) {
+        for (var i = 0; i < 6 + level; i++) {
+          final tip =
+              center +
+              Offset.fromDirection(
+                i * 2 * math.pi / (6 + level) + phase * .32,
+                radius + 5 * fade,
+              );
+          canvas.drawCircle(tip, 2.5 * fade, Paint()..color = ring.color);
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(PeerRipple old) =>
+      t != old.t || color != old.color || level != old.level;
 }
 
 class _Glow {
