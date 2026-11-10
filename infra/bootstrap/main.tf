@@ -1,5 +1,6 @@
 terraform {
   required_version = "~> 1.12.0"
+  backend "gcs" { prefix = "bootstrap" }
   required_providers {
     google = { source = "hashicorp/google", version = "~> 7.0" }
   }
@@ -78,6 +79,10 @@ resource "google_storage_bucket_iam_member" "state" {
   bucket = google_storage_bucket.state.name
   role   = "roles/storage.objectAdmin"
   member = google_service_account.deploy.member
+  condition {
+    title      = "production_state"
+    expression = "resource.name == 'projects/_/buckets/${google_storage_bucket.state.name}' || resource.name.startsWith('projects/_/buckets/${google_storage_bucket.state.name}/objects/production/')"
+  }
 }
 resource "google_artifact_registry_repository_iam_member" "push" {
   location   = var.region
