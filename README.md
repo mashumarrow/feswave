@@ -1,6 +1,9 @@
 # FESWAVE
 
-![FESWAVE](apps/feswave_android/assets/feswave.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/feswave_android/assets/feswave.svg">
+  <img alt="FESWAVE" src="apps/feswave_android/assets/feswave-light.svg" width="268" height="60">
+</picture>
 
 ライブで思わず手を叩きたくなった瞬間に、スマホの画面をタップ。近くの人も同じタイミングで盛り上がると、その人の好きな曲が「共感メモリ」として端末に残ります。Android向けのオープンソースアプリです。
 

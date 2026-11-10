@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flame/game.dart' show GameWidget;
 import 'package:flutter/material.dart';
-import 'package:mesh_gradient/mesh_gradient.dart';
+import 'stage_background.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../profile/models.dart';
@@ -228,28 +228,7 @@ class _LivePageState extends ConsumerState<LivePage>
             alignment: Alignment.center,
             children: [
               Positioned.fill(
-                child: RepaintBoundary(
-                  child: AnimatedMeshGradient(
-                    key: ValueKey(
-                      reduced || !TickerMode.valuesOf(context).enabled,
-                    ),
-                    seed: reduced || !TickerMode.valuesOf(context).enabled
-                        ? 2.7
-                        : null,
-                    colors: const [
-                      Color(0xff172b44),
-                      Color(0xff579e9a),
-                      Color(0xffbd7083),
-                      Color(0xff47314e),
-                    ],
-                    options: AnimatedMeshGradientOptions(
-                      frequency: 4.4,
-                      amplitude: 5.2,
-                      speed: 1.3,
-                      grain: .12,
-                    ),
-                  ),
-                ),
+                child: StageBackground(level: level, reduced: reduced),
               ),
               const Positioned.fill(
                 child: IgnorePointer(
