@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name" translatable="false">FESWAVE</string>
+    <string name="app_description">ライブでタップして、近くの参加者と盛り上がった瞬間を記録。</string>
+</resources>

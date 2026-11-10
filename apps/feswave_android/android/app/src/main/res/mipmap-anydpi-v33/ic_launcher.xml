@@ -1,0 +1,5 @@
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/stage_background" />
+    <foreground android:drawable="@drawable/wave" />
+    <monochrome android:drawable="@drawable/wave_mono" />
+</adaptive-icon>
