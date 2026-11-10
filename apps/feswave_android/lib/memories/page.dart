@@ -79,42 +79,15 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
           ),
         ],
       ),
-      const SizedBox(height: 8),
       Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final only in [false, true])
-                TextButton(
-                  onPressed: () => setState(() => favorites = only),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(48, 44),
-                    backgroundColor: favorites == only
-                        ? const Color(0xff24132d)
-                        : Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      side: BorderSide(
-                        color: favorites == only
-                            ? const Color(0xff783d8a)
-                            : Colors.transparent,
-                      ),
-                    ),
-                  ),
-                  child: Text(
-                    only ? '♡ お気に入り' : 'すべて',
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ),
-            ],
-          ),
-          const Text(
-            '公開を許可した参加者のみ表示',
-            style: TextStyle(fontSize: 10, color: Color(0xffa594b2)),
-          ),
+          for (final only in [false, true])
+            ChoiceChip(
+              label: Text(only ? 'お気に入り' : 'すべて'),
+              selected: favorites == only,
+              onSelected: (_) => setState(() => favorites = only),
+            ),
         ],
       ),
       const SizedBox(height: 22),
@@ -134,17 +107,19 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
                     children: [
                       const Icon(Icons.favorite_border, color: lilac, size: 32),
                       const SizedBox(height: 10),
-                      Text(favorites ? '大切なメモリを、お気に入りに。' : '最初の「同じ！」を見つけよう。'),
+                      Text(favorites ? 'お気に入りはまだありません' : '共感メモリはまだありません'),
                       Text(
                         favorites
                             ? 'メモリのハートを押すと、ここに残せます。'
-                            : '双方がプロフィールを公開し、近くで一緒にリアクションすると記録されます。',
+                            : 'お互いに曲を公開して、近くで同じ5秒間に同じくらいタップすると記録されます。',
                         style: noteStyle,
                         textAlign: TextAlign.center,
                       ),
                       TextButton(
-                        onPressed: () => context.go('/live'),
-                        child: const Text('ライブに戻る  →'),
+                        onPressed: () => favorites
+                            ? setState(() => favorites = false)
+                            : context.go('/live'),
+                        child: Text(favorites ? 'すべてのメモリを見る' : 'ライブへ'),
                       ),
                     ],
                   ),
@@ -167,7 +142,7 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
                           ),
                           onTap: () => showPerson(context, p),
                           trailing: IconButton(
-                            tooltip: 'お気に入り',
+                            tooltip: m.favorite ? 'お気に入りから外す' : 'お気に入りに追加',
                             icon: Icon(
                               m.favorite
                                   ? Icons.favorite
@@ -183,7 +158,13 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
                   ),
               ];
             },
-            error: (e, _) => [Text('$e')],
+            error: (_, _) => [
+              const Text('メモリを読み込めませんでした。'),
+              TextButton(
+                onPressed: () => ref.invalidate(historyProvider),
+                child: const Text('再読み込み'),
+              ),
+            ],
             loading: () => [const LinearProgressIndicator()],
           ),
       const WaveFooter(),

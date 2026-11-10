@@ -26,6 +26,7 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
   Future<void> _operations = Future.value(), _gatt = Future.value();
   Timer? timer;
   Gate gate = Gate.checking;
+  bool needsSettings = false;
   String message = '';
   bool active = false, foreground = true, busy = false, refreshing = false;
   int id = 0, lastSlot = -1, epoch = 0;
@@ -79,21 +80,33 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
       final states = request
           ? (await permissions.request()).values
           : await Future.wait(permissions.map((p) => p.status));
+      needsSettings = states.any((p) => p.isPermanentlyDenied);
       if (states.any((p) => !p.isGranted)) {
-        throw StateError('付近のデバイスと位置情報の権限が必要です');
+        block('近くの参加者を見つけるには、付近のデバイスと正確な位置情報を許可してください。');
+        return;
       }
       if (await Permission.bluetooth.serviceStatus.isDisabled) {
-        throw StateError('Bluetoothをオンにしてください');
+        block('端末の設定でBluetoothをオンにしてください。');
+        return;
       }
       if (await Permission.locationWhenInUse.serviceStatus.isDisabled) {
-        throw StateError('位置情報をオンにしてください');
+        block('端末の設定で位置情報をオンにしてください。');
+        return;
       }
-      await ref.read(accountProvider.future);
+      if (ref.read(accountProvider).hasError) ref.invalidate(accountProvider);
+      try {
+        await ref.read(accountProvider.future);
+      } catch (error) {
+        debugPrint('FESWAVE account load failed: $error');
+        block('端末のプロフィールを読み込めません。アプリのバージョンを確認して、もう一度お試しください。');
+        return;
+      }
       gate = Gate.ready;
       message = '';
       if (foreground && !active) await _serial(_start);
     } catch (e) {
-      block(e.toString());
+      debugPrint('FESWAVE start failed: $e');
+      block('ライブを開始できません。もう一度お試しください。');
     } finally {
       busy = false;
       update();
@@ -154,7 +167,7 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
     try {
       await radio.stop();
     } catch (e) {
-      message = 'BLE停止 · $e';
+      debugPrint('BLE stop failed: $e');
     } finally {
       await WakelockPlus.disable();
       people.clear();
@@ -202,7 +215,7 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
               }
             })
             .catchError((Object e) {
-              block('広告更新に失敗しました · $e');
+              block('Bluetooth通信が止まりました。ライブを再開してください。');
             })
             .whenComplete(() => refreshing = false),
       );
@@ -303,7 +316,7 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
       }
     } catch (e) {
       processed.remove(key);
-      message = 'メモリ保存に失敗しました · $e';
+      message = '共感メモリを保存できませんでした。';
       update();
     }
   }

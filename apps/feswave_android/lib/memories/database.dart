@@ -29,6 +29,15 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'feswave'));
   @override
   int get schemaVersion => 1;
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      // The retired v2 build only added a table. Both v1 tables are compatible.
+      if (from == 2 && to == 1) return;
+      throw StateError('未対応のデータベースバージョンです ($from → $to)');
+    },
+  );
+
   Future<String?> setting(String k) async => (await (select(
     settings,
   )..where((t) => t.key.equals(k))).getSingleOrNull())?.value;

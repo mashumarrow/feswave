@@ -57,6 +57,8 @@ class Avatar extends StatelessWidget {
       child: Center(
         child: Text(
           p.name.isEmpty ? '♪' : p.name.characters.first,
+          semanticsLabel: '',
+          textScaler: TextScaler.noScaling,
           style: TextStyle(
             color: Colors.white,
             shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
@@ -116,8 +118,10 @@ Future<void> showPerson(
             children: [
               Expanded(
                 child: Text(
-                  demo ? 'DEMO PARTICIPANT' : 'ON THE SAME WAVE',
-                  style: captionStyle,
+                  person.name,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
               IconButton(
@@ -128,11 +132,8 @@ Future<void> showPerson(
             ],
           ),
         ),
+        if (demo) const Text('デモ参加者', style: noteStyle),
         Flexible(child: ProfileCard(person)),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('閉じる'),
-        ),
       ],
     ),
   ),
@@ -148,9 +149,6 @@ class ProfileCard extends StatelessWidget {
     children: [
       Center(child: Avatar(p, size: 76)),
       const SizedBox(height: 10),
-      Center(
-        child: Text(p.name, style: Theme.of(context).textTheme.headlineSmall),
-      ),
       if (p.artist.isNotEmpty || p.song.isNotEmpty)
         Center(
           child: Text(
@@ -191,15 +189,16 @@ void notice(BuildContext c, Object message) {
   }
 }
 
+const noteStyle = TextStyle(
+  fontSize: 14,
+  height: 1.5,
+  color: Color(0xffc5b9cc),
+);
+
 const captionStyle = TextStyle(
   fontSize: 10,
   letterSpacing: 1.4,
   color: Color(0xffc3a4d4),
-);
-const noteStyle = TextStyle(
-  fontSize: 12,
-  height: 1.6,
-  color: Color(0xffb6a9c2),
 );
 
 class PageHeading extends StatelessWidget {

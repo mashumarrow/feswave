@@ -8,6 +8,7 @@ import '../profile/models.dart';
 import '../ui/shared.dart';
 import '../ui/stage.dart';
 import 'session.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'protocol.dart';
 import 'orbit.dart';
 
@@ -20,7 +21,8 @@ class LivePage extends ConsumerStatefulWidget {
 
 class _LivePageState extends ConsumerState<LivePage>
     with SingleTickerProviderStateMixin {
-  late final orbit = AnimationController(
+  AnimationController? _orbit;
+  AnimationController get orbit => _orbit ??= AnimationController(
     vsync: this,
     duration: const Duration(seconds: 60),
   )..repeat();
@@ -28,7 +30,8 @@ class _LivePageState extends ConsumerState<LivePage>
   late final StreamSubscription<int> flashes;
   int pulse = 0;
   final demoGauge = ReactionGauge();
-  Timer? demoTick;
+  Timer? demoTick, memoryBannerTimer;
+  String? memoryPartner;
   static final demo = [
     (
       Profile(name: 'haru', artist: 'YOASOBI', song: '群青', color: 'pink'),
@@ -73,21 +76,37 @@ class _LivePageState extends ConsumerState<LivePage>
   @override
   void initState() {
     super.initState();
+    if (widget.demoCount == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(liveProvider.notifier).check(request: false);
+      });
+    }
     flashes = ref.read(liveProvider.notifier).effects.stream.listen((id) {
       if (!mounted || !TickerMode.valuesOf(context).enabled) return;
       if (MediaQuery.disableAnimationsOf(context)) {
         notice(context, '共感メモリに保存しました');
       } else {
         game.flash(id);
+        memoryBannerTimer?.cancel();
+        final partner = ref
+            .read(liveProvider.notifier)
+            .people[id]
+            ?.profile
+            ?.name;
+        setState(() => memoryPartner = partner ?? '');
+        memoryBannerTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted) setState(() => memoryPartner = null);
+        });
       }
     });
   }
 
   @override
   void dispose() {
+    memoryBannerTimer?.cancel();
     demoTick?.cancel();
     flashes.cancel();
-    orbit.dispose();
+    _orbit?.dispose();
     super.dispose();
   }
 
@@ -96,6 +115,29 @@ class _LivePageState extends ConsumerState<LivePage>
     ref.watch(liveProvider);
     final session = ref.read(liveProvider.notifier);
     final benchmark = widget.demoCount > 0;
+    if (!benchmark && !session.active) {
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const PageHeading('SAME MUSIC. SAME MOMENT.', 'Live', 'wave', ''),
+          if (session.busy || session.gate != Gate.blocked)
+            const LinearProgressIndicator(semanticsLabel: 'ライブを準備中')
+          else ...[
+            Text(session.message),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => session.check(),
+              child: const Text('ライブを始める'),
+            ),
+            if (session.needsSettings)
+              TextButton(
+                onPressed: openAppSettings,
+                child: const Text('アプリの設定を開く'),
+              ),
+          ],
+        ],
+      );
+    }
     final people = session.people.values.toList()
       ..sort((a, b) => b.proximity.compareTo(a.proximity));
     final items = <({int id, Profile profile, double near, int level})>[
@@ -132,6 +174,10 @@ class _LivePageState extends ConsumerState<LivePage>
         });
       } else {
         session.tap();
+      }
+      if (!reduced) {
+        final nextLevel = gauge.levelAt(session.now);
+        game.beat(nextLevel, rising: nextLevel > level);
       }
       setState(() => pulse++);
     }
@@ -177,7 +223,12 @@ class _LivePageState extends ConsumerState<LivePage>
                               alignment: Alignment.center,
                               children: [
                                 Positioned.fill(
-                                  child: CustomPaint(painter: OrbitGrid(level)),
+                                  child: CustomPaint(
+                                    painter: OrbitGrid(
+                                      level,
+                                      reduced ? null : orbit,
+                                    ),
+                                  ),
                                 ),
                                 for (final item in items)
                                   TweenAnimationBuilder<double>(
@@ -254,7 +305,10 @@ class _LivePageState extends ConsumerState<LivePage>
                                                       }
                                                     } catch (e) {
                                                       if (context.mounted) {
-                                                        notice(context, e);
+                                                        notice(
+                                                          context,
+                                                          'プロフィールを読み込めません。近くでもう一度お試しください。',
+                                                        );
                                                       }
                                                     }
                                                   },
@@ -438,6 +492,50 @@ class _LivePageState extends ConsumerState<LivePage>
                       ),
                     ),
                   ),
+                  if (memoryPartner != null)
+                    Positioned(
+                      top: 2,
+                      left: 4,
+                      right: 4,
+                      child: IgnorePointer(
+                        child:
+                            Semantics(
+                                  liveRegion: true,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xff194961),
+                                          Color(0xff602350),
+                                        ],
+                                      ),
+                                      border: Border.all(color: cyan),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      child: Text(
+                                        memoryPartner!.isEmpty
+                                            ? '共感メモリが生まれました'
+                                            : '$memoryPartner と共感メモリが生まれました',
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .animate()
+                                .fadeIn(duration: 180.ms)
+                                .slideY(begin: -.18, end: 0),
+                      ),
+                    ),
                   Positioned(
                     left: 0,
                     right: 0,
