@@ -71,7 +71,7 @@ async function stop(running) {
 test("migrates the existing single favorite into a collection without losing its icon", async () => {
   const db = await isolatedDatabase();
   try {
-    for (const name of ["0001_initial.sql", "0003_profile_music.sql"])
+    for (const name of ["0001_initial.sql", "0004_profile_music.sql"])
       await db.admin.query(
         await readFile(
           new URL(`../migrations/${name}`, import.meta.url),
@@ -93,7 +93,7 @@ test("migrates the existing single favorite into a collection without losing its
     );
     await db.admin.query(
       await readFile(
-        new URL("../migrations/0004_favorite_tracks.sql", import.meta.url),
+        new URL("../migrations/0005_favorite_tracks.sql", import.meta.url),
         "utf8",
       ),
     );

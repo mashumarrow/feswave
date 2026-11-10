@@ -32,3 +32,5 @@ cargo run --locked
 USBデバッグでは各端末で `adb -s <serial> reverse tcp:3000 tcp:3000` を実行する。デバッグAPKの既定接続先は http://127.0.0.1:3000/api/ 。公開環境では `flutter build apk --dart-define=API_BASE_URL=https://your-host/api/` とし、配布用署名を別途設定する。
 
 Googleログインを使う場合は、アプリID jp.feswave.feswave_android とAPK署名のSHA-1に対応するAndroid OAuthクライアントを登録する。同じGoogle CloudプロジェクトのWebクライアントIDをAPI側の GOOGLE_CLIENT_ID に設定する。HTTPS環境では COOKIE_SECURE=true とする。認証の設定がない環境でもゲスト参加と曲検索を利用できる。
+
+DBマイグレーションは `services/api/migrations` に置く。適用済みの番号と内容は維持し、新規ファイルには未使用の次の番号を使う。
