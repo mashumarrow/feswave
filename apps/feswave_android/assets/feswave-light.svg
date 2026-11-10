@@ -2,10 +2,10 @@
   <title id="title">FESWAVE</title>
   <defs>
     <linearGradient id="crest" x1="0" y1="1" x2="1" y2="0">
-      <stop stop-color="#085866"/><stop offset=".52" stop-color="#137d79"/><stop offset="1" stop-color="#388b78"/>
+      <stop stop-color="#0059d8"/><stop offset=".52" stop-color="#009bd1"/><stop offset="1" stop-color="#00b69b"/>
     </linearGradient>
     <linearGradient id="echo" x1="0" y1="1" x2="1" y2="0">
-      <stop stop-color="#853956"/><stop offset=".55" stop-color="#ae5056"/><stop offset="1" stop-color="#bd6344"/>
+      <stop stop-color="#bd087b"/><stop offset=".55" stop-color="#f11972"/><stop offset="1" stop-color="#ff633a"/>
     </linearGradient>
   </defs>
   <g transform="translate(2 0)">
