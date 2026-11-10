@@ -13,6 +13,7 @@ final apiProvider = Provider<ProfileApi>((ref) => ProfileApi());
 typedef Account = ({Profile profile, bool linked});
 final accountProvider = AsyncNotifierProvider<AccountController, Account>(
   AccountController.new,
+  retry: (_, _) => null,
 );
 
 class AccountController extends AsyncNotifier<Account> {

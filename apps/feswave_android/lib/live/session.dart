@@ -93,11 +93,19 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
         block('端末の設定で位置情報をオンにしてください。');
         return;
       }
-      await ref.read(accountProvider.future);
+      if (ref.read(accountProvider).hasError) ref.invalidate(accountProvider);
+      try {
+        await ref.read(accountProvider.future);
+      } catch (error) {
+        debugPrint('FESWAVE account load failed: $error');
+        block('端末のプロフィールを読み込めません。アプリのバージョンを確認して、もう一度お試しください。');
+        return;
+      }
       gate = Gate.ready;
       message = '';
       if (foreground && !active) await _serial(_start);
     } catch (e) {
+      debugPrint('FESWAVE start failed: $e');
       block('ライブを開始できません。もう一度お試しください。');
     } finally {
       busy = false;

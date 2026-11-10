@@ -7,6 +7,43 @@ import 'package:feswave_android/memories/database.dart';
 import 'package:feswave_android/profile/models.dart';
 
 void main() {
+  test(
+    'reopens the old exchange build database and preserves local data',
+    () async {
+      final dir = await Directory.systemTemp.createTemp();
+      addTearDown(() => dir.delete(recursive: true));
+      final file = File('${dir.path}/feswave.sqlite');
+      final previous = AppDatabase(NativeDatabase(file));
+      await previous.put('account', 'saved profile');
+      await previous.remember(
+        'session',
+        'peer',
+        1,
+        1,
+        const Profile(name: '参加者'),
+      );
+      await previous.customStatement(
+        'CREATE TABLE exchanged_profiles (exchange_id TEXT PRIMARY KEY, received_at INTEGER NOT NULL, person TEXT NOT NULL)',
+      );
+      await previous.customStatement('PRAGMA user_version = 2');
+      await previous.close();
+
+      final db = AppDatabase(NativeDatabase(file));
+      try {
+        expect(await db.setting('account'), 'saved profile');
+        expect(await db.select(db.memories).get(), hasLength(1));
+        expect(
+          (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
+            'user_version',
+          ),
+          1,
+        );
+      } finally {
+        await db.close();
+      }
+    },
+  );
+
   test('gauge holds across slots and decays from the last tap', () {
     final gauge = ReactionGauge();
     for (int i = 0; i < 40; i++) {
