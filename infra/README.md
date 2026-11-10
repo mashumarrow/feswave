@@ -1,6 +1,6 @@
 # 本番APIのデプロイ
 
-本番はGCPプロジェクト `feswave` の東京リージョンを使う。Cloud RunがRust APIを実行し、Cloud SQL for PostgreSQL 17にUnixソケット経由で接続する。配布用APKの接続先は `https://feswave-api-933816421570.asia-northeast1.run.app/api/`。ローカルのUSBデバッグは[開発手順](../README.md#曲検索とプロフィール同期)を使う。
+本番はGCPプロジェクト `feswave` の東京リージョンを使う。Cloud RunがRust APIを実行し、Cloud SQL for PostgreSQL 17にUnixソケット経由で接続する。配布用APKの接続先は `https://feswave-api-933816421570.asia-northeast1.run.app/api/`。ローカルのUSBデバッグは[開発手順](../docs/development.md#ローカルapiで曲検索とプロフィール同期を試す)を使う。
 
 - Pull RequestではTerraformの書式・構成、PostgreSQLを使うAPIテスト、コンテナビルドを検証する。
 - `services/api/`、`infra/`、APIワークフローの変更がmainに入ると、GitHub Actionsの「FESWAVE API」がテスト、Artifact Registryへのpush、Terraformのplan・apply、公開 `/api/health` のDB疎通確認を順に行う。手動再実行もmainを指定する。
