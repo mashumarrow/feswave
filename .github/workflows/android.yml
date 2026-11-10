@@ -1,6 +1,16 @@
 name: Build demo APK
 
-on: workflow_dispatch
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'apps/feswave_android/**'
+      - '!apps/feswave_android/**/*.md'
+      - '!apps/feswave_android/test/**'
+      - '!apps/feswave_android/verification/**'
+      - '!apps/feswave_android/tool/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
