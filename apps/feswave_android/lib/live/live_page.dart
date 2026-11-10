@@ -8,6 +8,7 @@ import '../profile/models.dart';
 import '../ui/shared.dart';
 import '../ui/stage.dart';
 import 'session.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'protocol.dart';
 import 'orbit.dart';
 
@@ -20,7 +21,8 @@ class LivePage extends ConsumerStatefulWidget {
 
 class _LivePageState extends ConsumerState<LivePage>
     with SingleTickerProviderStateMixin {
-  late final orbit = AnimationController(
+  AnimationController? _orbit;
+  AnimationController get orbit => _orbit ??= AnimationController(
     vsync: this,
     duration: const Duration(seconds: 60),
   )..repeat();
@@ -73,6 +75,11 @@ class _LivePageState extends ConsumerState<LivePage>
   @override
   void initState() {
     super.initState();
+    if (widget.demoCount == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(liveProvider.notifier).check(request: false);
+      });
+    }
     flashes = ref.read(liveProvider.notifier).effects.stream.listen((id) {
       if (!mounted || !TickerMode.valuesOf(context).enabled) return;
       if (MediaQuery.disableAnimationsOf(context)) {
@@ -87,7 +94,7 @@ class _LivePageState extends ConsumerState<LivePage>
   void dispose() {
     demoTick?.cancel();
     flashes.cancel();
-    orbit.dispose();
+    _orbit?.dispose();
     super.dispose();
   }
 
@@ -96,6 +103,29 @@ class _LivePageState extends ConsumerState<LivePage>
     ref.watch(liveProvider);
     final session = ref.read(liveProvider.notifier);
     final benchmark = widget.demoCount > 0;
+    if (!benchmark && !session.active) {
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const PageHeading('ライブ'),
+          if (session.busy || session.gate != Gate.blocked)
+            const LinearProgressIndicator(semanticsLabel: 'ライブを準備中')
+          else ...[
+            Text(session.message),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => session.check(),
+              child: const Text('ライブを始める'),
+            ),
+            if (session.needsSettings)
+              TextButton(
+                onPressed: openAppSettings,
+                child: const Text('アプリの設定を開く'),
+              ),
+          ],
+        ],
+      );
+    }
     final people = session.people.values.toList()
       ..sort((a, b) => b.proximity.compareTo(a.proximity));
     final items = <({int id, Profile profile, double near, int level})>[
@@ -139,7 +169,7 @@ class _LivePageState extends ConsumerState<LivePage>
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 22),
       children: [
-        const PageHeading('SAME MUSIC. SAME MOMENT.', 'Live', 'wave', ''),
+        const PageHeading('ライブ'),
         WavePanel(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
           children: [
@@ -148,9 +178,11 @@ class _LivePageState extends ConsumerState<LivePage>
               children: [
                 const WaveIcon('people', size: 16, color: Color(0xffa793b9)),
                 const SizedBox(width: 5),
-                Text(
-                  '${!benchmark ? people.length : items.length}  ${!benchmark ? "LIVE" : "DEMO"}',
-                  style: captionStyle,
+                Flexible(
+                  child: Text(
+                    '近くの参加者 ${benchmark ? items.length : people.length}人',
+                    style: noteStyle,
+                  ),
                 ),
               ],
             ),
@@ -237,6 +269,8 @@ class _LivePageState extends ConsumerState<LivePage>
                                                 label:
                                                     '${item.profile.name}のプロフィール',
                                                 child: GestureDetector(
+                                                  behavior:
+                                                      HitTestBehavior.opaque,
                                                   onTap: () async {
                                                     try {
                                                       final p = !benchmark
@@ -254,7 +288,10 @@ class _LivePageState extends ConsumerState<LivePage>
                                                       }
                                                     } catch (e) {
                                                       if (context.mounted) {
-                                                        notice(context, e);
+                                                        notice(
+                                                          context,
+                                                          'プロフィールを読み込めません。近くでもう一度お試しください。',
+                                                        );
                                                       }
                                                     }
                                                   },
@@ -294,11 +331,7 @@ class _LivePageState extends ConsumerState<LivePage>
                                                       SizedBox(
                                                         width: 78,
                                                         child: Text(
-                                                          !benchmark
-                                                              ? item
-                                                                    .profile
-                                                                    .name
-                                                              : "${item.profile.name} · demo",
+                                                          item.profile.name,
                                                           maxLines: 1,
                                                           overflow: TextOverflow
                                                               .ellipsis,
@@ -306,7 +339,7 @@ class _LivePageState extends ConsumerState<LivePage>
                                                               TextAlign.center,
                                                           style:
                                                               const TextStyle(
-                                                                fontSize: 9,
+                                                                fontSize: 12,
                                                               ),
                                                         ),
                                                       ),
@@ -348,7 +381,7 @@ class _LivePageState extends ConsumerState<LivePage>
                                   ),
                                 Semantics(
                                   button: true,
-                                  label: 'リアクション',
+                                  label: 'リアクションを送る',
                                   child: GestureDetector(
                                     onTap: react,
                                     child:
@@ -417,9 +450,9 @@ class _LivePageState extends ConsumerState<LivePage>
                                   child: Transform.translate(
                                     offset: const Offset(0, 60),
                                     child: Text(
-                                      'YOU   LEVEL $level',
+                                      'タップ',
                                       style: const TextStyle(
-                                        fontSize: 8,
+                                        fontSize: 12,
                                         letterSpacing: 1.4,
                                         color: Color(0xffc6abc9),
                                       ),
@@ -438,26 +471,15 @@ class _LivePageState extends ConsumerState<LivePage>
                       ),
                     ),
                   ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Text(
-                      !benchmark && people.isEmpty
-                          ? '周辺の参加者を待っています。'
-                          : benchmark && pulse > 0
-                          ? 'デモ体験中 · 履歴には保存されません'
-                          : '同じ音楽で、つながっている。',
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: Color(0xffa198af),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
                 ],
               ),
             ),
+            if (benchmark || people.isEmpty)
+              Text(
+                benchmark ? 'デモ中 · メモリには保存されません' : '近くの参加者を探しています',
+                style: noteStyle,
+                textAlign: TextAlign.center,
+              ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -478,45 +500,10 @@ class _LivePageState extends ConsumerState<LivePage>
               ],
             ),
             const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                level == 0 ? 'タップして、盛り上がりをシェア' : 'LEVEL $level',
-                style: const TextStyle(fontSize: 9, color: Color(0xffa198af)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: const Color(0xff8649a0)),
-                gradient: const LinearGradient(
-                  colors: [Color(0xff10273b), Color(0xff30132f)],
-                ),
-              ),
-              child: TextButton.icon(
-                onPressed: react,
-                style: TextButton.styleFrom(minimumSize: const Size(0, 64)),
-                icon: const WaveIcon('tap', size: 26, color: Color(0xffb3cdf8)),
-                label: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tap to React  ✧',
-                      style: TextStyle(fontSize: 18, color: Colors.white),
-                    ),
-                    Text(
-                      '今の気持ちを、タップで届けよう',
-                      style: TextStyle(fontSize: 9, color: Color(0xffaca0ba)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            Text('盛り上がり $level / 5', style: noteStyle),
             if (session.message.isNotEmpty) Text(session.message),
           ],
         ),
-        const WaveFooter(),
       ],
     );
   }

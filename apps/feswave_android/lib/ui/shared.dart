@@ -57,6 +57,8 @@ class Avatar extends StatelessWidget {
       child: Center(
         child: Text(
           p.name.isEmpty ? '♪' : p.name.characters.first,
+          semanticsLabel: '',
+          textScaler: TextScaler.noScaling,
           style: TextStyle(
             color: Colors.white,
             shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
@@ -116,8 +118,10 @@ Future<void> showPerson(
             children: [
               Expanded(
                 child: Text(
-                  demo ? 'DEMO PARTICIPANT' : 'ON THE SAME WAVE',
-                  style: captionStyle,
+                  person.name,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
               IconButton(
@@ -128,11 +132,8 @@ Future<void> showPerson(
             ],
           ),
         ),
+        if (demo) const Text('デモ参加者', style: noteStyle),
         Flexible(child: ProfileCard(person)),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('閉じる'),
-        ),
       ],
     ),
   ),
@@ -148,9 +149,6 @@ class ProfileCard extends StatelessWidget {
     children: [
       Center(child: Avatar(p, size: 76)),
       const SizedBox(height: 10),
-      Center(
-        child: Text(p.name, style: Theme.of(context).textTheme.headlineSmall),
-      ),
       if (p.artist.isNotEmpty || p.song.isNotEmpty)
         Center(
           child: Text(
@@ -191,72 +189,21 @@ void notice(BuildContext c, Object message) {
   }
 }
 
-const captionStyle = TextStyle(
-  fontSize: 10,
-  letterSpacing: 1.4,
-  color: Color(0xffc3a4d4),
-);
 const noteStyle = TextStyle(
-  fontSize: 12,
-  height: 1.6,
-  color: Color(0xffb6a9c2),
+  fontSize: 14,
+  height: 1.5,
+  color: Color(0xffc5b9cc),
 );
 
 class PageHeading extends StatelessWidget {
-  const PageHeading(
-    this.kicker,
-    this.title,
-    this.icon,
-    this.description, {
-    super.key,
-  });
-  final String kicker, title, description;
-  final String icon;
+  const PageHeading(this.title, {super.key});
+  final String title;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 18),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          kicker,
-          style: const TextStyle(
-            fontSize: 8,
-            letterSpacing: 1.4,
-            color: Color(0xffae91c9),
-          ),
-        ),
-        const SizedBox(height: 7),
-        Row(
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 30,
-                height: 1.2,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -1,
-              ),
-            ),
-            const SizedBox(width: 9),
-            WaveIcon(
-              icon,
-              color: title == 'Live' ? cyan : pink,
-              size: title == 'Live' ? 33 : 25,
-            ),
-          ],
-        ),
-        const SizedBox(height: 9),
-        if (description.isNotEmpty)
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 10,
-              height: 1.7,
-              color: Color(0xff938c9f),
-            ),
-          ),
-      ],
+    child: Semantics(
+      header: true,
+      child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
     ),
   );
 }
@@ -287,11 +234,4 @@ class WavePanel extends StatelessWidget {
       children: children,
     ),
   );
-}
-
-class WaveFooter extends StatelessWidget {
-  const WaveFooter({super.key});
-  @override
-  Widget build(BuildContext context) =>
-      const Text('FESWAVE  © 2026', style: captionStyle);
 }

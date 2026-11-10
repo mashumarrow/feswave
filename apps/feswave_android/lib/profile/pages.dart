@@ -20,7 +20,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     try {
       await f();
     } catch (e) {
-      if (mounted) notice(context, e);
+      if (mounted) notice(context, 'アカウントを更新できませんでした。通信状態を確認してやり直してください。');
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -31,28 +31,71 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final account = ref.watch(accountProvider);
     return account.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('$e')),
+      error: (_, _) =>
+          _ProfileLoadError(onRetry: () => ref.invalidate(accountProvider)),
       data: (a) {
         final controller = ref.read(accountProvider.notifier);
         return ListView(
           padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 22),
           children: [
-            const PageHeading(
-              'YOUR MUSIC. YOUR IDENTITY.',
-              'Profile',
-              'user',
-              'あなたの「好き」が、つながりのきっかけに。',
+            const PageHeading('プロフィール'),
+            Center(child: Avatar(a.profile, size: 80)),
+            const SizedBox(height: 12),
+            Text(
+              a.profile.name.isEmpty ? 'ニックネーム未登録' : a.profile.name,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
+            if (a.profile.song.isNotEmpty || a.profile.artist.isNotEmpty)
+              Text(
+                [
+                  a.profile.song,
+                  a.profile.artist,
+                ].where((v) => v.isNotEmpty).join(' · '),
+                textAlign: TextAlign.center,
+              ),
+            const SizedBox(height: 8),
+            Text(
+              a.profile.visible ? '曲とアイコンを公開中' : '曲とアイコンは非公開',
+              textAlign: TextAlign.center,
+              style: noteStyle,
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () => context.go('/profile/edit'),
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(a.profile.name.isEmpty ? 'プロフィールを作成' : 'プロフィールを編集'),
+            ),
+            if (a.profile.tracks.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Text('好きな曲', style: Theme.of(context).textTheme.titleMedium),
+              for (final t in a.profile.tracks)
+                ListTile(
+                  title: Text(t.trackName),
+                  subtitle: Text(t.artistName),
+                  leading: Icon(
+                    t.trackId == a.profile.favoriteTrackId
+                        ? Icons.star
+                        : Icons.music_note,
+                    semanticLabel: t.trackId == a.profile.favoriteTrackId
+                        ? '代表曲'
+                        : null,
+                  ),
+                ),
+            ],
+            const SizedBox(height: 24),
             WavePanel(
               padding: const EdgeInsets.all(22),
               children: [
-                const Text('ACCOUNT', style: captionStyle),
-                const SizedBox(height: 8),
                 Text(
-                  a.linked ? 'Googleアカウントでログイン中' : 'プロフィールを、次のライブにも。',
+                  a.linked ? 'Googleアカウントでログイン中' : 'アカウント',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const Text('Googleアカウントでプロフィールと好きな曲を引き継げます。', style: noteStyle),
+                if (!a.linked)
+                  const Text(
+                    'Googleアカウントでプロフィールと好きな曲を引き継げます。',
+                    style: noteStyle,
+                  ),
                 const SizedBox(height: 12),
                 if (a.linked)
                   OutlinedButton(
@@ -84,91 +127,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               height: 20,
                             ),
                             const SizedBox(width: 12),
-                            const Text('Googleでログイン'),
+                            const Flexible(child: Text('Googleでログイン')),
                           ],
                         ),
                 ),
               ],
             ),
-            if (a.profile.name.isEmpty)
-              WavePanel(
-                center: true,
-                children: [
-                  const Icon(Icons.person_outline, size: 36, color: lilac),
-                  const Text('あなたの音楽を、教えてください。'),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'ニックネームと好きな曲を登録して、同じライブを楽しむ誰かとつながろう。',
-                    style: noteStyle,
-                    textAlign: TextAlign.center,
-                  ),
-                  FilledButton(
-                    onPressed: () => context.go('/profile/edit'),
-                    child: const Text('プロフィールを作成'),
-                  ),
-                ],
-              )
-            else ...[
-              WavePanel(
-                center: true,
-                children: [
-                  const Text('THIS IS YOUR WAVE.', style: captionStyle),
-                  const SizedBox(height: 12),
-                  Avatar(a.profile, size: 84),
-                  Text(
-                    a.profile.name,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const Text('音楽でつながる、もっと近くに。', style: noteStyle),
-                  OutlinedButton.icon(
-                    onPressed: () => context.go('/profile/edit'),
-                    icon: const Icon(Icons.settings_outlined, size: 16),
-                    label: const Text('プロフィールを編集'),
-                  ),
-                  const Divider(),
-                  Text(
-                    '${ref.watch(historyProvider).value?.length ?? "—"}  共感メモリ',
-                    style: noteStyle,
-                  ),
-                ],
-              ),
-              WavePanel(
-                children: [
-                  const Text('♫  FAVORITE ARTIST', style: captionStyle),
-                  Text(
-                    a.profile.artist.isEmpty ? 'まだ登録されていません' : a.profile.artist,
-                  ),
-                ],
-              ),
-              WavePanel(
-                children: [
-                  const Text('♡  FAVORITE TRACKS', style: captionStyle),
-                  if (a.profile.tracks.isEmpty)
-                    Text(
-                      a.profile.song.isEmpty ? 'まだ登録されていません' : a.profile.song,
-                    ),
-                  for (final t in a.profile.tracks)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(t.trackName),
-                      subtitle: Text(t.artistName),
-                      leading: Icon(
-                        t.trackId == a.profile.favoriteTrackId
-                            ? Icons.star
-                            : Icons.music_note,
-                        color: lilac,
-                      ),
-                    ),
-                ],
-              ),
-              WavePanel(
-                children: [
-                  const Text('PRIVACY & SHARING', style: captionStyle),
-                  Text(a.profile.visible ? 'プロフィールを公開中' : 'プロフィールは非公開'),
-                ],
-              ),
-            ],
-            const WaveFooter(),
             if (busy) const LinearProgressIndicator(),
           ],
         );
@@ -177,20 +141,51 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 }
 
-class ProfileEditor extends ConsumerStatefulWidget {
-  const ProfileEditor({super.key});
+class _ProfileLoadError extends StatelessWidget {
+  const _ProfileLoadError({required this.onRetry});
+  final VoidCallback onRetry;
   @override
-  ConsumerState<ProfileEditor> createState() => _Editor();
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('プロフィールを読み込めませんでした。'),
+        TextButton(onPressed: onRetry, child: const Text('再読み込み')),
+      ],
+    ),
+  );
 }
 
-class _Editor extends ConsumerState<ProfileEditor> {
+class ProfileEditor extends ConsumerWidget {
+  const ProfileEditor({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(accountProvider)
+      .when(
+        data: (a) => _ProfileForm(a.profile),
+        error: (_, _) =>
+            _ProfileLoadError(onRetry: () => ref.invalidate(accountProvider)),
+        loading: () => const Center(child: CircularProgressIndicator()),
+      );
+}
+
+class _ProfileForm extends ConsumerStatefulWidget {
+  const _ProfileForm(this.profile);
+  final Profile profile;
+  @override
+  ConsumerState<_ProfileForm> createState() => _Editor();
+}
+
+class _Editor extends ConsumerState<_ProfileForm> {
+  final nameFocus = FocusNode();
+  bool nameInvalid = false;
   late Profile draft;
   late final TextEditingController name, artist, song;
   bool saving = false;
   @override
   void initState() {
     super.initState();
-    draft = ref.read(accountProvider).requireValue.profile;
+    draft = widget.profile;
     name = TextEditingController(text: draft.name);
     artist = TextEditingController(text: draft.artist);
     song = TextEditingController(text: draft.song);
@@ -198,6 +193,7 @@ class _Editor extends ConsumerState<ProfileEditor> {
 
   @override
   void dispose() {
+    nameFocus.dispose();
     name.dispose();
     artist.dispose();
     song.dispose();
@@ -227,7 +223,8 @@ class _Editor extends ConsumerState<ProfileEditor> {
 
   Future<void> save() async {
     if (name.text.trim().isEmpty) {
-      notice(context, 'ニックネームを入力してください');
+      setState(() => nameInvalid = true);
+      nameFocus.requestFocus();
       return;
     }
     setState(() => saving = true);
@@ -244,7 +241,12 @@ class _Editor extends ConsumerState<ProfileEditor> {
       if (!mounted) return;
       context.go('/profile');
     } catch (e) {
-      if (mounted) notice(context, e);
+      if (mounted) {
+        notice(
+          context,
+          e is StateError ? e.message : '変更を保存できませんでした。もう一度お試しください。',
+        );
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -288,21 +290,31 @@ class _Editor extends ConsumerState<ProfileEditor> {
       const SizedBox(height: 16),
       TextField(
         controller: name,
-        onChanged: (_) => setState(() {}),
+        focusNode: nameFocus,
+        onChanged: (_) => setState(
+          () => nameInvalid = nameInvalid && name.text.trim().isEmpty,
+        ),
         maxLength: 20,
-        decoration: const InputDecoration(labelText: 'ニックネーム'),
+        decoration: InputDecoration(
+          labelText: 'ニックネーム',
+          errorText: nameInvalid ? 'ニックネームを入力してください' : null,
+        ),
       ),
       Wrap(
         spacing: 9,
         children: [
-          for (final c in ['pink', 'purple', 'blue', 'orange'])
-            IconButton(
-              tooltip: c,
-              onPressed: () => setState(() => draft = draft.copyWith(color: c)),
-              icon: Icon(
-                draft.color == c ? Icons.check_circle : Icons.circle,
-                color: tint(c),
-              ),
+          for (final entry in const {
+            'pink': 'ピンク',
+            'purple': '紫',
+            'blue': '青',
+            'orange': 'オレンジ',
+          }.entries)
+            ChoiceChip(
+              label: Text(entry.value),
+              avatar: Icon(Icons.circle, color: tint(entry.key), size: 16),
+              selected: draft.color == entry.key,
+              onSelected: (_) =>
+                  setState(() => draft = draft.copyWith(color: entry.key)),
             ),
         ],
       ),
@@ -360,7 +372,9 @@ class _Editor extends ConsumerState<ProfileEditor> {
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: const Text('好きな曲とアイコンを公開'),
-        subtitle: const Text('近くの人と共感メモリを残す'),
+        subtitle: const Text(
+          'オンにすると、近くの参加者に好きな曲とジャケットを表示し、共感メモリを残せます。名前と色は常に表示されます。',
+        ),
         value: draft.visible,
         onChanged: (v) => setState(() => draft = draft.copyWith(visible: v)),
       ),
@@ -389,11 +403,24 @@ class _Search extends ConsumerState<MusicSearch> {
     super.dispose();
   }
 
+  void reset() {
+    cancel?.cancel();
+    setState(() {
+      loading = false;
+      tracks = [];
+      msg = '';
+    });
+  }
+
   Future<void> search(String term) async {
     cancel?.cancel();
+    if (term.trim().isEmpty) {
+      reset();
+      return;
+    }
     final token = CancelToken();
     cancel = token;
-    if (term.trim().isEmpty) return;
+
     setState(() {
       loading = true;
       msg = '';
@@ -409,7 +436,7 @@ class _Search extends ConsumerState<MusicSearch> {
       }
     } catch (e) {
       if (mounted && !token.isCancelled) {
-        setState(() => msg = '曲検索に失敗しました。接続先を確認して再検索してください。');
+        setState(() => msg = '曲を検索できませんでした。通信状態を確認して、もう一度検索してください。');
       }
     } finally {
       if (mounted && !token.isCancelled) setState(() => loading = false);
@@ -420,19 +447,25 @@ class _Search extends ConsumerState<MusicSearch> {
   Widget build(BuildContext context) => FractionallySizedBox(
     heightFactor: .8,
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom,
+      ),
       child: Column(
         children: [
           TextField(
             autofocus: true,
             textInputAction: TextInputAction.search,
+            onChanged: (_) => reset(),
             onSubmitted: search,
             decoration: const InputDecoration(
               prefixIcon: Icon(Icons.search),
               labelText: '曲名・アーティストで検索',
             ),
           ),
-          if (loading) const LinearProgressIndicator(),
+          if (loading) const LinearProgressIndicator(semanticsLabel: '曲を検索中'),
           if (msg.isNotEmpty) Text(msg),
           Expanded(
             child: ListView(

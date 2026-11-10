@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'live/live_page.dart';
-import 'live/session.dart';
 import 'profile/pages.dart';
 import 'memories/page.dart';
-import 'services.dart';
 import 'ui/shared.dart';
 
 void main() => runApp(const ProviderScope(child: Feswave()));
@@ -45,6 +43,8 @@ class Feswave extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp.router(
     title: 'FESWAVE',
+    supportedLocales: const [Locale('ja')],
+    localizationsDelegates: GlobalMaterialLocalizations.delegates,
     debugShowCheckedModeBanner: false,
     routerConfig: router,
     theme: ThemeData(
@@ -54,6 +54,7 @@ class Feswave extends StatelessWidget {
       ).copyWith(primary: lilac, surface: panel),
       scaffoldBackgroundColor: ink,
       useMaterial3: true,
+      textTheme: const TextTheme(bodySmall: noteStyle),
       dividerColor: const Color(0xff352841),
       cardTheme: CardThemeData(
         color: panel,
@@ -66,7 +67,7 @@ class Feswave extends StatelessWidget {
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
         backgroundColor: const Color(0xff100d19),
-        indicatorColor: Colors.transparent,
+        indicatorColor: const Color(0xff492249),
         iconTheme: WidgetStateProperty.resolveWith(
           (s) => IconThemeData(
             color: s.contains(WidgetState.selected)
@@ -103,7 +104,7 @@ class Feswave extends StatelessWidget {
       chipTheme: ChipThemeData(
         selectedColor: const Color(0xff46214f),
         backgroundColor: panel,
-        showCheckmark: false,
+        showCheckmark: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -115,122 +116,20 @@ class Feswave extends StatelessWidget {
   );
 }
 
-class Shell extends ConsumerStatefulWidget {
+class Shell extends StatelessWidget {
   const Shell({super.key, required this.shell});
   final StatefulNavigationShell shell;
   @override
-  ConsumerState<Shell> createState() => _ShellState();
-}
-
-class _ShellState extends ConsumerState<Shell> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(liveProvider.notifier).check();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(
-      liveProvider.select((_) {
-        final s = ref.read(liveProvider.notifier);
-        return (s.gate, s.message, s.busy);
-      }),
-    );
-    final active = ref.watch(
-      liveProvider.select((_) => ref.read(liveProvider.notifier).active),
-    );
-    final account = ref.watch(accountProvider);
-    final ready = state.$1 == Gate.ready && account.hasValue;
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: ink,
-        actions: ready
-            ? [
-                Text(
-                  active ? '●  LIVE' : '接続中',
-                  style: TextStyle(
-                    fontSize: 10,
-                    letterSpacing: 1,
-                    color: active ? cyan : pink,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'プロフィール',
-                  onPressed: () => context.go('/profile'),
-                  icon: const WaveIcon('user', size: 17),
-                ),
-              ]
-            : null,
-        scrolledUnderElevation: 0,
-        titleSpacing: 20,
-        toolbarHeight: 57,
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1),
-        ),
-        title: ShaderMask(
-          shaderCallback: (bounds) =>
-              const LinearGradient(colors: [cyan, pink]).createShader(bounds),
-          child: const Text(
-            'FESWAVE',
-            style: TextStyle(
-              fontSize: 15,
-              letterSpacing: 1,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-      body: SafeArea(
-        child: ready
-            ? widget.shell
-            : Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (state.$1 == Gate.blocked) ...[
-                        const Icon(
-                          Icons.bluetooth_disabled,
-                          size: 44,
-                          color: lilac,
-                        ),
-                        Text(state.$2, textAlign: TextAlign.center),
-                        FilledButton(
-                          onPressed: state.$3
-                              ? null
-                              : () => ref.read(liveProvider.notifier).check(),
-                          child: const Text('再確認'),
-                        ),
-                        TextButton(
-                          onPressed: openAppSettings,
-                          child: const Text('設定を開く'),
-                        ),
-                      ] else if (account.hasError)
-                        Text('端末データを開けません · ${account.error}')
-                      else
-                        const CircularProgressIndicator(),
-                    ],
-                  ),
-                ),
-              ),
-      ),
-      bottomNavigationBar: ready
-          ? NavigationBar(
-              selectedIndex: widget.shell.currentIndex,
-              onDestinationSelected: widget.shell.goBranch,
-              destinations: const [
-                NavigationDestination(icon: WaveIcon('live'), label: 'ライブ'),
-                NavigationDestination(icon: WaveIcon('heart'), label: 'メモリ'),
-                NavigationDestination(icon: WaveIcon('user'), label: 'プロフィール'),
-              ],
-            )
-          : null,
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(child: shell),
+    bottomNavigationBar: NavigationBar(
+      selectedIndex: shell.currentIndex,
+      onDestinationSelected: shell.goBranch,
+      destinations: const [
+        NavigationDestination(icon: WaveIcon('live'), label: 'ライブ'),
+        NavigationDestination(icon: WaveIcon('heart'), label: 'メモリ'),
+        NavigationDestination(icon: WaveIcon('user'), label: 'プロフィール'),
+      ],
+    ),
+  );
 }
