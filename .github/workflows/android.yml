@@ -47,7 +47,6 @@ jobs:
 
   publish:
     needs: build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/flutter-android-app' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write

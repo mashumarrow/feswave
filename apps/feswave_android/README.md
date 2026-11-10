@@ -20,7 +20,7 @@ Freezed・Driftのモデル定義を変更したときは `mise exec -- dart run
 
 Androidアプリやビルド設定を変更してブランチにpushすると、GitHub Actions の「Build demo APK」がarm64のデバッグAPKを自動ビルドする。各実行のArtifactsから `feswave-demo-arm64` をダウンロードできる。ドキュメント・テスト・検証記録・開発用ツールだけの変更は対象外。
 
-`feat/flutter-android-app` と `main` ではビルドしたAPKをGitHub Releasesにも自動配置する。Assetsの `feswave-demo-arm64.apk` を直接ダウンロードできる。ブランチからは実行ごとのプレリリースを作り、`v*` タグをpushするとそのタグのReleaseに添付する。新規ReleaseはデバッグAPKの配布用としてプレリリース扱いになる。
+対象ブランチへのpushまたは手動実行でビルドが成功すると、GitHub Releasesに実行ごとのプレリリースを作り、`feswave-demo-arm64.apk` を添付する。どのブランチでも利用できる。`v*` タグのpushではそのタグを使い、同じ実行を再試行すると既存ReleaseのAPKを更新する。
 
 ローカルでビルドする場合は次を実行する。
 
