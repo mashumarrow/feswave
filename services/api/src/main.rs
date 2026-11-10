@@ -487,7 +487,7 @@ async fn health(State(app): State<Shared>) -> ApiResult<StatusCode> {
 
 fn router(app: Shared) -> Router {
     Router::new()
-        .route("/healthz", get(health))
+        .route("/api/health", get(health))
         .route("/api/session", get(session))
         .route("/api/auth/google", post(google_login))
         .route("/api/auth/challenge", post(google_challenge))
