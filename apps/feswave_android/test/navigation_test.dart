@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:feswave_android/live/session.dart';
 import 'package:feswave_android/live/live_page.dart';
+import 'package:feswave_android/live/membrane.dart';
 import 'package:feswave_android/main.dart';
 import 'package:feswave_android/profile/api.dart';
 import 'package:feswave_android/profile/models.dart';
@@ -64,13 +65,26 @@ void main() {
       await tester.tapAt(tester.getCenter(find.text('Tap to react')));
       await tester.pump();
       expect(find.text('LEVEL 2'), findsOneWidget);
-      final pulse = tester.widget<ScaleTransition>(
-        find.byKey(const ValueKey('tap-pulse')),
+      final paint = tester.widget<CustomPaint>(
+        find.byWidgetPredicate(
+          (w) => w is CustomPaint && w.painter is MembranePainter,
+        ),
       );
+      final membrane = paint.painter! as MembranePainter;
+      final hit = membrane.hits.last;
       await tester.pump(const Duration(milliseconds: 80));
-      expect(pulse.scale.value, greaterThan(1.18));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(pulse.scale.value, closeTo(1, .001));
+      expect(
+        hit.displacement(hit.angle, membrane.pulse.value, 0),
+        lessThan(-.2),
+      );
+      expect(hit.displacement(hit.angle + 3.14, membrane.pulse.value, 0), 0);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(
+        hit.displacement(hit.angle + 3.14, membrane.pulse.value, 0),
+        lessThan(0),
+      );
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(hit.displacement(hit.angle, membrane.pulse.value, 0), 0);
       await tester.tap(find.text('haru · demo'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));

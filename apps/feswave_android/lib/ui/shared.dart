@@ -16,6 +16,17 @@ Color tint(String color) => switch (color) {
   _ => pink,
 };
 
+class FeswaveLogo extends StatelessWidget {
+  const FeswaveLogo({super.key});
+  @override
+  Widget build(BuildContext context) => SvgPicture.asset(
+    'assets/feswave.svg',
+    width: 116,
+    height: 26,
+    semanticsLabel: 'FESWAVE',
+  );
+}
+
 class WaveIcon extends StatelessWidget {
   const WaveIcon(this.name, {super.key, this.size = 21, this.color});
   final String name;
