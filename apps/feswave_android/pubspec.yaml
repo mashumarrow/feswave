@@ -1,0 +1,40 @@
+name: feswave_android
+description: "FESWAVE Android live proximity and shared music memories."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter_riverpod: ^3.3.2
+  go_router: ^17.5.0
+  dio: ^5.11.1
+  cookie_jar: ^4.0.9
+  dio_cookie_manager: ^3.5.0
+  flutter_secure_storage: ^10.3.4
+  drift: 2.34.0
+  drift_flutter: ^0.3.1
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.12.0
+  cached_network_image: ^3.4.1
+  url_launcher: ^6.3.3
+  flutter_animate: ^4.5.2
+  flame: ^1.38.2
+  bluetooth_low_energy: 6.2.1
+  permission_handler: ^12.0.1
+  wakelock_plus: ^1.4.0
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  drift_dev: 2.34.0
+  build_runner: ^2.15.1
+  freezed: ^3.2.5
+  json_serializable: ^6.14.1
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
