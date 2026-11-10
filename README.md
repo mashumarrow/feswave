@@ -73,4 +73,4 @@ DB変更は [migrations](services/api/migrations) に次の未使用番号のSQL
 
 ## ライセンス
 
-FESWAVEのソースコードは [MIT License](LICENSE) で公開しています。依存ライブラリにはそれぞれのライセンスが適用されます。Googleのロゴ、曲のジャケット画像などの第三者素材は各権利者に帰属します。
+FESWAVEのソースコードは [MIT License](LICENSE) で公開しています。依存ライブラリにはそれぞれのライセンスが適用されます。Googleのロゴ、曲のジャケット画像などの第三者素材は各権利者に帰属します。 第三者の著作権表示と利用条件は [Third-party licenses](THIRD_PARTY_LICENSES.md) を参照してください。
