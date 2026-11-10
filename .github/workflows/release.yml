@@ -35,8 +35,6 @@ jobs:
         with:
           install_args: git-cliff@2.14.2
       - id: version
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           latest=$(git tag --list --sort=-v:refname | grep -Ex 'v[0-9]+\.[0-9]+\.[0-9]+' | sed -n '1p')
           if git merge-base --is-ancestor HEAD "$latest"; then
@@ -129,6 +127,12 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "FESWAVE $TAG" --notes-file release-notes.md
           fi
-          gh release view "$TAG" --json isDraft,targetCommitish --jq 'select(.isDraft) | .targetCommitish' | grep -Fx "$GITHUB_SHA"
+          draft_target=$(gh release view "$TAG" --json isDraft,targetCommitish --jq 'select(.isDraft) | .targetCommitish')
+          if [[ "$draft_target" != "$GITHUB_SHA" ]]; then
+            # Resume an interrupted draft only when the new build includes its source.
+            [[ "$draft_target" =~ ^[a-f0-9]{40}$ ]]
+            gh api "repos/$GH_REPO/compare/$draft_target...$GITHUB_SHA" --jq '.status' | grep -Fx ahead
+            gh release edit "$TAG" --target "$GITHUB_SHA" --notes-file release-notes.md
+          fi
           gh release upload "$TAG" feswave-android-arm64.apk feswave-android-arm64.apk.sha256 --clobber
           gh release edit "$TAG" --draft=false --prerelease=false --latest
