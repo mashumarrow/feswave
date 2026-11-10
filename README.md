@@ -15,6 +15,10 @@
 
 ライブで好きなフレーズが流れたら、スマホの画面をタップします。近くで同じように反応した人がいると、その人が公開している曲が「共感メモリ」として自分の端末に残ります。ライブのあとでも「メモリ」を開いて曲を見返せます。
 
+| プロフィール | ライブ | 共感メモリ |
+| :---: | :---: | :---: |
+| <a href="docs/images/profile.png"><img src="docs/images/profile.png" width="190" alt="好きな曲を公開したプロフィール"></a> | <a href="docs/images/live.png"><img src="docs/images/live.png" width="190" alt="近くの参加者とタップの反応を表示するライブ画面"></a> | <a href="docs/images/memories.png"><img src="docs/images/memories.png" width="190" alt="ライブのあとに端末に残った共感メモリの一覧"></a> |
+
 ## 2台で試す
 
 Android 12以上で、Bluetooth LEの広告とスキャンに対応したarm64端末を2台用意してください。曲を手入力すれば、ゲストのままオフラインで試せます。[最新版APKをダウンロード](https://github.com/mashumarrow/feswave/releases/latest/download/feswave-android-arm64.apk)
