@@ -1,0 +1,5 @@
+distance_m,receiver,unix_window_5s,peer_id,median_15s_dbm,last_seen_age_ms
+1,Pixel,358857383,8326e098,-67.0,101
+1,Redmi,358857383,2d3e1ca7,-62.0,133
+2,Pixel,358857398,8326e098,-86.5,4
+2,Redmi,358857398,2d3e1ca7,-80.0,633

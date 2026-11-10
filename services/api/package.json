@@ -1,0 +1,24 @@
+{
+  "name": "feswave",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "音楽でつながる、FESWAVE リアルタイム交流アプリ",
+  "scripts": {
+    "build:server": "node scripts/cargo.mjs build",
+    "start": "node scripts/cargo.mjs run",
+    "dev": "npm start",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose stop db",
+    "db:local": "node scripts/db-local.mjs",
+    "db:local:stop": "node scripts/db-local.mjs --stop",
+    "db:import": "node scripts/cargo.mjs run -- --import-json",
+    "test": "node scripts/cargo.mjs test && node scripts/cargo.mjs build && node --test test/server.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "pg": "^8.23.1"
+  }
+}

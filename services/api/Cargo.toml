@@ -1,0 +1,17 @@
+[package]
+name = "feswave"
+version = "0.2.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate"] }
+dotenvy = "0.15"
+sha2 = "0.10"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+jsonwebtoken = { version = "11", default-features = false, features = ["rust_crypto", "use_pem"] }
+
