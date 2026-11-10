@@ -94,4 +94,54 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text('前の曲'), findsNothing);
   });
+
+  testWidgets('文字を拡大してキーボードを表示中でも長い曲名を選べる', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 800);
+    addTearDown(tester.view.reset);
+    final api = _SearchApi();
+    Track? selected;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [apiProvider.overrideWithValue(api)],
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () async {
+                  selected = await showModalBottomSheet<Track>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => const MusicSearch(),
+                  );
+                },
+                child: const Text('曲を追加'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('曲を追加'));
+    await tester.pumpAndSettle();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.enterText(find.byType(TextField), 'ライブ');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    final track = Track(
+      trackId: 7,
+      artistName: 'アーティスト',
+      trackName: 'ライブ音源' * 8,
+    );
+    api.result.complete([track]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(track.trackName));
+    await tester.pumpAndSettle();
+    expect(selected, track);
+  });
 }
