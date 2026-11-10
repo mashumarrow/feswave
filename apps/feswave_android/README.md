@@ -18,7 +18,11 @@ mise exec -- flutter run -d DEVICE_ID
 
 Freezed・Driftのモデル定義を変更したときは `mise exec -- dart run build_runner build` を実行し、生成差分もコミットする。静的解析は `mise exec -- flutter analyze`、BLE判定やメモリ保存のテストは `mise exec -- flutter test test/live_test.dart` で個別に実行できる。
 
-Androidアプリやビルド設定を変更してブランチにpushすると、GitHub Actions の「Build demo APK」がarm64のデバッグAPKを自動ビルドする。各実行のArtifactsから `feswave-demo-arm64` をダウンロードできる。ドキュメント・テスト・検証記録・開発用ツールだけの変更は対象外。ローカルでビルドする場合は次を実行する。
+Androidアプリやビルド設定を変更してブランチにpushすると、GitHub Actions の「Build demo APK」がarm64のデバッグAPKを自動ビルドする。各実行のArtifactsから `feswave-demo-arm64` をダウンロードできる。ドキュメント・テスト・検証記録・開発用ツールだけの変更は対象外。
+
+`feat/flutter-android-app` と `main` ではビルドしたAPKをGitHub Releasesにも自動配置する。Assetsの `feswave-demo-arm64.apk` を直接ダウンロードできる。ブランチからは実行ごとのプレリリースを作り、`v*` タグをpushするとそのタグのReleaseに添付する。新規ReleaseはデバッグAPKの配布用としてプレリリース扱いになる。
+
+ローカルでビルドする場合は次を実行する。
 
 ```sh
 mise exec -- flutter build apk --debug --target-platform android-arm64
