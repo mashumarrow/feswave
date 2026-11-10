@@ -4,6 +4,8 @@ import 'package:feswave_android/live/session.dart';
 import 'package:feswave_android/live/live_page.dart';
 import 'package:feswave_android/live/membrane.dart';
 import 'package:feswave_android/main.dart';
+import 'package:feswave_android/memories/database.dart';
+import 'package:feswave_android/memories/page.dart';
 import 'package:feswave_android/profile/api.dart';
 import 'package:feswave_android/profile/models.dart';
 import 'package:feswave_android/profile/pages.dart';
@@ -134,6 +136,44 @@ void main() {
     await tester.tap(find.text('変更を保存'));
     await tester.pumpAndSettle();
     expect(find.text('ニックネームを入力してください'), findsOneWidget);
+  });
+
+  testWidgets('同日のメモリは日付をまとめ、絞り込み後も代表曲と日付を表示する', (tester) async {
+    final slot = DateTime(2026, 11, 10, 12).millisecondsSinceEpoch ~/ 5000;
+    Memory memory(int offset, {bool favorite = false}) => Memory(
+      session: 'test',
+      peer: 'peer',
+      slot: slot - offset,
+      level: 2,
+      person:
+          '{"name":"参加者","tracks":[{"trackId":7,"trackName":"代表曲","artistName":"歌手"}],"favoriteTrackId":7}',
+      favorite: favorite,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          historyProvider.overrideWith(
+            (_) => Stream.value([
+              memory(0),
+              memory(1, favorite: true),
+              memory(17280),
+            ]),
+          ),
+        ],
+        child: const MaterialApp(home: Scaffold(body: MemoriesPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('2026年11月10日'), findsOneWidget);
+    expect(find.text('2026年11月9日'), findsOneWidget);
+    await tester.tap(find.text('お気に入り'));
+    await tester.pumpAndSettle();
+    expect(find.text('代表曲'), findsOneWidget);
+    expect(find.text('2026年11月10日'), findsOneWidget);
+    expect(find.text('2026年11月9日'), findsNothing);
+    await tester.tap(find.text('参加者'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('閉じる'), findsOneWidget);
   });
 
   testWidgets('検索語を消すと進捗と遅れて届いた結果を表示しない', (tester) async {

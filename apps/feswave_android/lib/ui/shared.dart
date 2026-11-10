@@ -299,10 +299,3 @@ class WavePanel extends StatelessWidget {
     ),
   );
 }
-
-class WaveFooter extends StatelessWidget {
-  const WaveFooter({super.key});
-  @override
-  Widget build(BuildContext context) =>
-      const Text('FESWAVE  © 2026', style: captionStyle);
-}
