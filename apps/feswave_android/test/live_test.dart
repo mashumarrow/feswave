@@ -7,6 +7,22 @@ import 'package:feswave_android/memories/database.dart';
 import 'package:feswave_android/profile/models.dart';
 
 void main() {
+  test('gauge holds across slots and decays from the last tap', () {
+    final gauge = ReactionGauge();
+    for (int i = 0; i < 40; i++) {
+      gauge.tap(4900);
+    }
+    expect(gauge.levelAt(5000), 5);
+    gauge.tap(7000);
+    expect(gauge.levelAt(9999), 5);
+    expect(gauge.levelAt(10000), 4);
+    expect(gauge.levelAt(11000), 3);
+    gauge.tap(11500);
+    expect(gauge.levelAt(14499), 4);
+    expect(gauge.levelAt(20000), 0);
+    gauge.tap(21000);
+    expect(gauge.levelAt(21000), 1);
+  });
   test('replays the recorded 1 m and 3 m handheld trials', () {
     final readings = <String, Nearby>{};
     for (final line in File(

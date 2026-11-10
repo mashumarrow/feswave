@@ -3,6 +3,27 @@ import '../profile/models.dart';
 
 const slotMs = 5000;
 int strength(int taps) => taps == 0 ? 0 : ((taps + 4) ~/ 5).clamp(1, 5);
+
+class ReactionGauge {
+  static const idleMs = 3000;
+  static const stepMs = 1000;
+  int _points = 0, _lastTap = 0;
+
+  int _pointsAt(int time) {
+    final elapsed = time - _lastTap - idleMs;
+    if (elapsed < 0) return _points;
+    final lost = 5 * (1 + elapsed ~/ stepMs);
+    return (_points - lost).clamp(0, 25);
+  }
+
+  int levelAt(int time) => strength(_pointsAt(time));
+
+  void tap(int time) {
+    _points = (_pointsAt(time) + 1).clamp(0, 25);
+    _lastTap = time;
+  }
+}
+
 String hexId(int id) => id.toRadixString(16).padLeft(8, '0');
 
 class Signal {
