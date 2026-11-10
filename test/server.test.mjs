@@ -401,7 +401,7 @@ test(
       assert.equal(memoriesA.length, 1);
       assert.equal(memoriesA[0].person.name, "Bob");
       assert.equal(memoriesB.length, 1);
-      assert.equal(memories[0].level, 5);
+      assert.equal(memoriesA[0].level, 5);
       assert.equal(memoriesB[0].level, 5);
       assert.equal(memoriesA[0].person.music.collectionName, "Catalog Album");
       assert.equal(memoriesA[0].person.tracks.length, 2);

@@ -1,3 +1,4 @@
+import { prepareGoogle, loginError, disableGoogleAutoSelect } from "./auth.js";
 import {
   MusicPicker,
   musicCollection,
@@ -65,6 +66,12 @@ const state: AppState = {
   demo: true,
 };
 let stream: EventSource | undefined;
+let google: Awaited<ReturnType<typeof prepareGoogle>> | undefined;
+let googleLinked = false;
+let authConfigured = false;
+let authBusy = false;
+let authUnavailable = false;
+let accountMarkup = "";
 let musicPicker: MusicPicker | undefined;
 let pendingJoin = false;
 let demoWindow = Math.floor(Date.now() / 5000);
@@ -426,6 +433,7 @@ function renderMemories() {
     .join("");
 }
 function renderProfile() {
+  renderAccount();
   const user = state.user;
   if (!user?.name) {
     $("#profile-content").innerHTML =
@@ -435,6 +443,48 @@ function renderProfile() {
   const partners = new Set(state.memories.map((m) => m.person.id)).size;
   $("#profile-content").innerHTML =
     `<div class="profile-grid"><section class="panel profile-main"><span class="section-kicker">THIS IS YOUR WAVE.</span>${avatar(user, "large")}<h2>${escape(user.name)}</h2><p>音楽でつながる、もっと近くに。</p><button class="subtle-btn" data-action="edit-profile">${icon("settings")} プロフィールを編集</button><div class="profile-stats"><div><strong>${state.memories.length}</strong><small>共感メモリ</small></div><div><strong>${partners}</strong><small>つながった人</small></div></div></section><div class="profile-details"><section class="panel profile-detail"><div class="section-kicker">${icon("music")} FAVORITE ARTIST</div><h3>${escape(user.artist || "まだ登録されていません")}</h3><p>心が動く、あなたのアーティスト。</p></section><section class="panel profile-detail"><div class="section-kicker">${icon("heart")} FAVORITE TRACKS</div>${user.music ? musicCollection(user.tracks, user.music) : `<h3>${escape(user.song || "まだ登録されていません")}</h3><p>何度でも聴きたくなる、あの一曲。</p>`}</section><section class="panel profile-detail"><span class="section-kicker">PRIVACY & SHARING</span><div class="privacy-status">${icon(user.visible ? "check" : "user")} ${user.visible ? "プロフィール共有：オン" : "プロフィール共有：オフ"}</div><p>${user.visible ? "共感した相手に、好きな音楽とニックネームを共有します。" : "共感メモリには記録されません。参加中はニックネームと反応のみ表示されます。"}<br>連絡先・正確な位置情報は収集しません。</p></section></div></div>`;
+}
+function renderAccount() {
+  const markup = `<section class="panel account-card" aria-label="アカウント"><span class="section-kicker">ACCOUNT</span><h2>${googleLinked ? "Googleアカウントでログイン中" : "プロフィールを、次のライブにも。"}</h2><p>${googleLinked ? "同じGoogleアカウントで、別の端末からもデータを復元できます。" : "初回は今のプロフィール・好きな曲・メモリを引き継ぎます。登録済みのアカウントなら、そのデータに切り替わります。"}</p>${googleLinked ? `<button class="subtle-btn" data-action="logout" ${authBusy ? "disabled" : ""}>${authBusy ? "ログアウト中…" : "ログアウト"}</button>` : `${google ? `<div id="google-signin-button" class="google-button-host ${authBusy ? "busy" : ""}" aria-busy="${authBusy}"></div>` : `<button class="google-login" disabled><img src="/google-g.png" width="20" height="20" alt="">Googleでログイン</button>`}<p class="account-hint" role="status">${authBusy ? "ログインしています…" : state.loading ? "接続を準備しています…" : !authConfigured ? "Googleログインは準備中です。ゲストとして利用できます。" : authUnavailable ? "Googleに接続できませんでした。通信環境を確認して再読み込みしてください。" : !google ? "Googleログインを準備しています…" : "ログインせず、ゲストとしても利用できます。"}</p>`}</section>`;
+  // Keep Google's iframe stable during periodic profile updates and while a popup is open.
+  if (markup === accountMarkup) return;
+  accountMarkup = markup;
+  $("#account-content").innerHTML = markup;
+  const container = document.querySelector<HTMLElement>("#google-signin-button");
+  if (google && container) google.render(container);
+}
+
+async function loginGoogle(idToken: string) {
+  if (authBusy) return;
+  authBusy = true;
+  renderAccount();
+  try {
+    await api("auth/google", { method: "POST", headers: { "X-Feswave-Auth": "1" }, body: JSON.stringify({ idToken }) });
+    disableGoogleAutoSelect();
+    stream?.close();
+    location.reload();
+  } catch (error) {
+    toast(loginError(error));
+  } finally {
+    authBusy = false;
+    renderAccount();
+  }
+}
+
+async function logoutAccount() {
+  if (authBusy) return;
+  authBusy = true;
+  renderAccount();
+  try {
+    await api("auth/logout", { method: "POST", headers: { "X-Feswave-Auth": "1" }, body: "{}" });
+    disableGoogleAutoSelect();
+    stream?.close();
+    location.reload();
+  } catch (error) {
+    toast(error instanceof Error ? error.message : "ログアウトできませんでした。");
+    authBusy = false;
+    renderAccount();
+  }
 }
 function personProfile(id: string) {
   const person = (state.demo ? demoPeople : state.participants).find(
@@ -448,7 +498,7 @@ function personProfile(id: string) {
 }
 function about() {
   openModal(
-    `<div class="modal-inner">${closeButton}<svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">FEEL THE SAME WAVE.</div><h2>音楽でつながる、<br>もっと近くに。</h2><div class="about-text"><p>FESWAVEは、ライブの感動を言葉を使わずに共有するアプリです。<strong>その瞬間の気持ちをタップ</strong>して届けましょう。</p><p>5秒間に1〜5タップでLevel 1、6〜10タップでLevel 2、11〜15タップでLevel 3、16〜20タップでLevel 4、21タップ以上でLevel 5。同じイベント・同じ時間帯でレベル差が1以内なら共感候補になります。</p><p>双方がプロフィールの共有を許可すると、5秒の集計後にメモリが保存されます。共有をオフにすると、相手の履歴からあなたの記録も削除されます。</p><p>デモ参加者はサンプル表示です。実際の参加者はイベント参加後に表示されます。</p><p>v0.2 ローカルMVP · Bluetooth、Spotify、位置推定、アカウント認証は未実装です。サーバー側に履歴を保存し、Cookieで端末を識別します。</p></div><button class="primary-btn full-width" data-action="close">LET'S FEEL THE WAVE ${icon("arrow")}</button></div>`,
+    `<div class="modal-inner">${closeButton}<svg class="modal-logo"><use href="#i-wave"/></svg><div class="eyebrow">FEEL THE SAME WAVE.</div><h2>音楽でつながる、<br>もっと近くに。</h2><div class="about-text"><p>FESWAVEは、ライブの感動を言葉を使わずに共有するアプリです。<strong>その瞬間の気持ちをタップ</strong>して届けましょう。</p><p>5秒間に1〜5タップでLevel 1、6〜10タップでLevel 2、11〜15タップでLevel 3、16〜20タップでLevel 4、21タップ以上でLevel 5。同じイベント・同じ時間帯でレベル差が1以内なら共感候補になります。</p><p>双方がプロフィールの共有を許可すると、5秒の集計後にメモリが保存されます。共有をオフにすると、相手の履歴からあなたの記録も削除されます。</p><p>デモ参加者はサンプル表示です。実際の参加者はイベント参加後に表示されます。</p><p>v0.2 ローカルMVP · Googleログインはプロフィール画面から利用できます。Bluetooth、Spotify、位置推定は未実装です。</p></div><button class="primary-btn full-width" data-action="close">LET'S FEEL THE WAVE ${icon("arrow")}</button></div>`,
   );
 }
 document.addEventListener("click", async (event) => {
@@ -483,6 +533,9 @@ document.addEventListener("click", async (event) => {
     return;
   }
   switch (target.dataset.action) {
+    case "logout":
+      logoutAccount();
+      break;
     case "close":
       closeModal();
       break;
@@ -590,6 +643,19 @@ try {
   const data = await api("session");
   state.user = data.user;
   state.events = data.events;
+  googleLinked = data.account.google;
+  authConfigured = Boolean(data.google);
+  if (data.google && !googleLinked) {
+    api("auth/challenge", { method: "POST", headers: { "X-Feswave-Auth": "1" }, body: "{}" })
+      .then(({ nonce }) => prepareGoogle(data.google!, nonce, loginGoogle))
+      .then((client) => {
+        google = client;
+        renderAccount();
+      }).catch(() => {
+        authUnavailable = true;
+        renderAccount();
+      });
+  }
   state.loading = false;
   if (state.user.eventId && state.user.name) {
     state.eventId = state.user.eventId;

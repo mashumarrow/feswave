@@ -15,6 +15,104 @@ fn token_hash(token: &str) -> String {
 }
 
 impl Store {
+    pub async fn google_challenge(&self, token: &str, nonce: &str) -> crate::ApiResult<String> {
+        // Reuse a valid challenge so multiple tabs do not invalidate each other.
+        let value = sqlx::query_scalar("UPDATE sessions SET google_login_nonce=CASE WHEN google_nonce_expires_at>NOW() THEN google_login_nonce ELSE $2 END,google_nonce_expires_at=CASE WHEN google_nonce_expires_at>NOW() THEN google_nonce_expires_at ELSE NOW()+INTERVAL '30 minutes' END WHERE token_hash=$1 AND expires_at>NOW() RETURNING google_login_nonce")
+            .bind(token_hash(token)).bind(nonce).fetch_optional(&self.pool).await?;
+        value.ok_or_else(|| {
+            crate::error(
+                axum::http::StatusCode::UNAUTHORIZED,
+                "画面を再読み込みしてください。",
+            )
+        })
+    }
+    pub async fn linked(&self, user_id: &str) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_identities WHERE user_id=$1::uuid AND provider='google')")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+    }
+
+    /// First login claims this guest; subsequent logins always restore the existing account.
+    /// Row locks serialize competing claims of a guest or a Google subject.
+    pub async fn google_login(
+        &self,
+        uid: &str,
+        guest_id: &str,
+        old_token: &str,
+        new_token: &str,
+        nonce: &str,
+    ) -> crate::ApiResult<User> {
+        let mut tx = self.pool.begin().await?;
+        // Lock the UID namespace before the user row to serialize simultaneous first logins.
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+            .bind(format!("google:{uid}"))
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("SELECT id FROM users WHERE id=$1::uuid FOR UPDATE")
+            .bind(guest_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        // Consume the session-bound nonce in this transaction. A token from a different
+        // browser, an expired challenge, or a replay after session rotation is rejected.
+        let consumed = sqlx::query("UPDATE sessions SET google_login_nonce=NULL,google_nonce_expires_at=NULL WHERE token_hash=$1 AND user_id=$2::uuid AND expires_at>NOW() AND google_login_nonce=$3 AND google_nonce_expires_at>NOW()")
+            .bind(token_hash(old_token)).bind(guest_id).bind(nonce).execute(&mut *tx).await?;
+        if consumed.rows_affected() != 1 {
+            return Err(crate::error(
+                axum::http::StatusCode::UNAUTHORIZED,
+                "ログインの有効時間が切れました。画面を再読み込みしてやり直してください。",
+            ));
+        }
+        let existing: Option<String> = sqlx::query_scalar(
+            "SELECT user_id::text FROM auth_identities WHERE provider='google' AND subject=$1",
+        )
+        .bind(uid)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let user_id = if let Some(user_id) = existing {
+            user_id
+        } else {
+            let linked: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM auth_identities WHERE user_id=$1::uuid AND provider='google')",
+            )
+            .bind(guest_id)
+            .fetch_one(&mut *tx)
+            .await?;
+            if linked {
+                return Err(crate::error(
+                    axum::http::StatusCode::CONFLICT,
+                    "別のGoogleアカウントを使うには、先にログアウトしてください。",
+                ));
+            }
+            sqlx::query("INSERT INTO auth_identities(provider,subject,user_id) VALUES('google',$1,$2::uuid)")
+                .bind(uid).bind(guest_id).execute(&mut *tx).await?;
+            // Previously issued guest cookies must not retain access to the claimed account.
+            sqlx::query("DELETE FROM sessions WHERE user_id=$1::uuid")
+                .bind(guest_id)
+                .execute(&mut *tx)
+                .await?;
+            guest_id.to_owned()
+        };
+        sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
+            .bind(token_hash(old_token))
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2::uuid,NOW()+INTERVAL '7 days')")
+            .bind(token_hash(new_token)).bind(&user_id).execute(&mut *tx).await?;
+        let user = sqlx::query_as::<_, User>("SELECT u.id::text AS id,u.name,u.artist,u.song,u.color,u.visible,u.event_id,u.music_track AS music,u.tracks,u.favorite_track_id FROM user_profiles u WHERE u.id=$1::uuid")
+            .bind(&user_id).fetch_one(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(user)
+    }
+
+    pub async fn delete_session(&self, token: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
+            .bind(token_hash(token))
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn connect(url: &str) -> Result<Self, sqlx::Error> {
         Ok(Self {
             pool: PgPoolOptions::new()
