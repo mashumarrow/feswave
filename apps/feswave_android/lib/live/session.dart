@@ -236,7 +236,7 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
       retryAfter.remove(s.id);
     }
     p.shared = s.shared;
-    p.level = s.level;
+    if (p.acceptReaction(s, time)) update();
     if (p.profile == null && (retryAfter[s.id] ?? 0) < time) {
       retryAfter[s.id] = time + 30000;
       unawaited(

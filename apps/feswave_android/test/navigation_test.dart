@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:feswave_android/live/session.dart';
+import 'package:feswave_android/live/orbit.dart';
+import 'package:feswave_android/live/protocol.dart';
 import 'package:feswave_android/live/live_page.dart';
 import 'package:feswave_android/live/membrane.dart';
 import 'package:feswave_android/main.dart';
@@ -37,6 +39,51 @@ class _SearchApi extends ProfileApi {
 }
 
 void main() {
+  testWidgets(
+    'a received REACT pulses once at the peer for each active window',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          liveProvider.overrideWith(_BlockedSession.new),
+          accountProvider.overrideWith(_Guest.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      final session = container.read(liveProvider.notifier)..active = true;
+      final peer = Nearby(7)
+        ..profile = const Profile(name: 'Haru')
+        ..revision = 0;
+      session.people[7] = peer;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Scaffold(body: LivePage())),
+        ),
+      );
+      final ripple = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is PeerRipple,
+      );
+      void receive(int slot, int level) =>
+          session.received(Signal(7, slot, level, false), -66);
+      receive(1, 3);
+      await tester.pump();
+      expect(ripple, findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1200));
+      expect(ripple, findsNothing);
+      receive(1, 3);
+      receive(0, 2);
+      await tester.pump();
+      expect(ripple, findsNothing);
+      receive(2, 0);
+      await tester.pump();
+      expect(ripple, findsNothing);
+      receive(3, 3);
+      await tester.pump();
+      expect(ripple, findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets(
     'stage corners and caption react; a participant opens their profile',
     (tester) async {
