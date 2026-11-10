@@ -101,5 +101,5 @@ jobs:
           terraform plan -input=false -lock-timeout=5m -out=release.tfplan
           terraform apply -input=false -lock-timeout=5m release.tfplan
           url=$(terraform output -raw url)
-          curl --fail --silent --show-error --retry 4 "$url/healthz"
+          curl --fail --silent --show-error --retry 4 "$url/api/health"
           echo "url=$url" >> "$GITHUB_OUTPUT"

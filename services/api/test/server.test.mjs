@@ -176,6 +176,7 @@ test(
       running = launch(db.url, port);
       await running.ready;
       const base = `http://127.0.0.1:${port}/api/`;
+      assert.equal((await fetch(base + "health")).status, 204);
       const request = async (path, cookie = "", method = "GET", body) => {
         const response = await fetch(base + path, {
           method,
