@@ -156,20 +156,7 @@ class Shell extends ConsumerWidget {
                 preferredSize: Size.fromHeight(1),
                 child: Divider(height: 1),
               ),
-              title: ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [cyan, pink],
-                ).createShader(bounds),
-                child: const Text(
-                  'FESWAVE',
-                  style: TextStyle(
-                    fontSize: 15,
-                    letterSpacing: 1,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              title: const FeswaveLogo(),
             ),
       body: SafeArea(bottom: !onStage, child: shell),
       bottomNavigationBar: NavigationBar(

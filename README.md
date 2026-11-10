@@ -19,6 +19,8 @@ mise exec -- flutter build apk --debug
 adb -s <serial> install -r build/app/outputs/flutter-apk/app-debug.apk
 ```
 
+ライブ中に右上のマイクアイコンを押してマイクを許可すると、中央のリングが周囲の音の周波数に合わせて動く。音声は端末内で解析し、保存・送信しない。タップによる脈動はマイクがオフでも使える。
+
 ## 曲検索・プロフィール同期
 
 PostgreSQLをインストール済みの開発PCでは以下を実行する。Dockerの場合はAPIディレクトリで.env.exampleを.envへコピーし、接続情報を設定して docker compose up -d --wait db を実行する。
