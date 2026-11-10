@@ -2,6 +2,7 @@
 //! The release/debug application has no fake-token or emulator bypass.
 use super::*;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+use std::collections::HashMap;
 
 fn token(uid: &str, nonce: &str) -> String {
     let mut header = Header::new(Algorithm::RS256);
@@ -67,18 +68,9 @@ async fn google_login_links_restores_rotates_and_logout_revokes_access() {
         .append_pair("options", &format!("-csearch_path={schema}"));
     let store = Store::connect(url.as_str()).await.unwrap();
     store.migrate().await.unwrap();
-    let (updates, _) = broadcast::channel(128);
     let app = Arc::new(App {
-        inner: Mutex::new(Inner {
-            users: HashMap::new(),
-            reactions: HashMap::new(),
-            clients: HashMap::new(),
-            last_window: window_id(now()),
-        }),
-        updates,
         events: store.events().await.unwrap(),
         store: store.clone(),
-        public_dir: root.join("public"),
         music: MusicService::new().unwrap(),
         auth: auth::GoogleAuth::for_tests().await,
         cookie_secure: true,

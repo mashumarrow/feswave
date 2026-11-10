@@ -1,4 +1,4 @@
-use crate::{Memory, PublicUser, User};
+use crate::{Memory, User};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -125,12 +125,6 @@ impl Store {
     pub async fn migrate(&self) -> Result<(), sqlx::migrate::MigrateError> {
         sqlx::migrate!().run(&self.pool).await
     }
-    pub async fn users(&self) -> Result<HashMap<String, User>, sqlx::Error> {
-        let users = sqlx::query_as::<_, User>("SELECT u.id::text AS id,u.name,u.artist,u.song,u.color,u.visible,u.event_id,u.music_track AS music,u.tracks,u.favorite_track_id FROM user_profiles u")
-            .fetch_all(&self.pool)
-            .await?;
-        Ok(users.into_iter().map(|u| (u.id.clone(), u)).collect())
-    }
     pub async fn events(&self) -> Result<Value, sqlx::Error> {
         let rows = sqlx::query("SELECT * FROM events ORDER BY sort_order, id")
             .fetch_all(&self.pool)
@@ -185,86 +179,6 @@ impl Store {
         }
         tx.commit().await
     }
-    pub async fn event_exists(&self, id: &str) -> Result<bool, sqlx::Error> {
-        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM events WHERE id=$1)")
-            .bind(id)
-            .fetch_one(&self.pool)
-            .await
-    }
-    pub async fn join(&self, uid: &str, event_id: &str) -> Result<(), sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("UPDATE users SET event_id=$2,updated_at=NOW() WHERE id=$1::uuid")
-            .bind(uid)
-            .bind(event_id)
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query("INSERT INTO event_participants(event_id,user_id) VALUES($1,$2::uuid) ON CONFLICT DO NOTHING").bind(event_id).bind(uid).execute(&mut *tx).await?;
-        tx.commit().await
-    }
-    pub async fn insert_memories(&self, memories: &[Memory]) -> Result<(), sqlx::Error> {
-        if memories.is_empty() {
-            return Ok(());
-        }
-        let mut tx = self.pool.begin().await?;
-        for m in memories {
-            // Lock profiles before checking consent so a concurrent revocation cannot leave a new memory behind.
-            let consenting = sqlx::query("SELECT id FROM users WHERE id IN ($1::uuid,$2::uuid) AND visible ORDER BY id FOR UPDATE")
-                .bind(&m.user_id).bind(&m.person.id).fetch_all(&mut *tx).await?;
-            if consenting.len() != 2 {
-                continue;
-            }
-            sqlx::query("INSERT INTO memories(id,user_id,person_id,event_id,occurred_at,level,favorite) VALUES($1::uuid,$2::uuid,$3::uuid,$4,to_timestamp($5::bigint::double precision/1000.0),$6,$7) ON CONFLICT(user_id,person_id,event_id,occurred_at) DO NOTHING")
-                .bind(&m.id).bind(&m.user_id).bind(&m.person.id).bind(&m.event_id).bind(m.at as i64).bind(m.level as i16).bind(m.favorite).execute(&mut *tx).await?;
-        }
-        tx.commit().await
-    }
-    pub async fn memories(&self, uid: &str) -> Result<Vec<Memory>, sqlx::Error> {
-        let rows = sqlx::query("SELECT m.id::text AS id,m.user_id::text AS user_id,m.event_id,(EXTRACT(EPOCH FROM m.occurred_at)*1000)::bigint AS at_ms,m.level,m.favorite,u.id::text AS person_id,u.name,u.artist,u.song,u.color,u.music_track AS music,u.tracks FROM memories m JOIN user_profiles u ON u.id=m.person_id WHERE m.user_id=$1::uuid AND u.visible ORDER BY m.occurred_at DESC,m.id")
-            .bind(uid).fetch_all(&self.pool).await?;
-        Ok(rows
-            .iter()
-            .map(|r| Memory {
-                id: r.get("id"),
-                user_id: r.get("user_id"),
-                event_id: r.get("event_id"),
-                at: r.get::<i64, _>("at_ms") as u64,
-                level: r.get::<i16, _>("level") as u8,
-                favorite: r.get("favorite"),
-                person: PublicUser {
-                    id: r.get("person_id"),
-                    name: r.get("name"),
-                    artist: r.get("artist"),
-                    song: r.get("song"),
-                    color: r.get("color"),
-                    music: r.get("music"),
-                    tracks: r.get("tracks"),
-                },
-            })
-            .collect())
-    }
-    pub async fn favorite(
-        &self,
-        uid: &str,
-        memory_id: &str,
-        favorite: bool,
-    ) -> Result<Option<Memory>, sqlx::Error> {
-        let changed =
-            sqlx::query("UPDATE memories SET favorite=$3 WHERE id=$1::uuid AND user_id=$2::uuid")
-                .bind(memory_id)
-                .bind(uid)
-                .bind(favorite)
-                .execute(&self.pool)
-                .await?;
-        if changed.rows_affected() == 0 {
-            return Ok(None);
-        }
-        Ok(self
-            .memories(uid)
-            .await?
-            .into_iter()
-            .find(|m| m.id == memory_id))
-    }
-
     pub async fn import_json(&self, path: &Path) -> Result<Value, Box<dyn std::error::Error>> {
         #[derive(Default, Deserialize)]
         #[serde(default)]

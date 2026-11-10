@@ -5,23 +5,20 @@
   "type": "module",
   "description": "音楽でつながる、FESWAVE リアルタイム交流アプリ",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
     "build:server": "node scripts/cargo.mjs build",
-    "start": "npm run build && node scripts/cargo.mjs run",
+    "start": "node scripts/cargo.mjs run",
     "dev": "npm start",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose stop db",
     "db:local": "node scripts/db-local.mjs",
     "db:local:stop": "node scripts/db-local.mjs --stop",
     "db:import": "node scripts/cargo.mjs run -- --import-json",
-    "test": "npm run typecheck && node scripts/cargo.mjs test && node scripts/cargo.mjs build && node --test test/server.test.mjs"
+    "test": "node scripts/cargo.mjs test && node scripts/cargo.mjs build && node --test test/server.test.mjs"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
-    "pg": "^8.23.1",
-    "typescript": "^7.0.2"
+    "pg": "^8.23.1"
   }
 }

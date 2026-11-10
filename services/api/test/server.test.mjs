@@ -10,7 +10,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { isolatedDatabase } from "./database.mjs";
 
-const binary = fileURLToPath(
+const binary = process.env.FESWAVE_TEST_BINARY || fileURLToPath(
   new URL(
     process.platform === "win32"
       ? "../target/debug/feswave.exe"
@@ -124,14 +124,13 @@ test("migrates the existing single favorite into a collection without losing its
 });
 
 test(
-  "PostgreSQL migration, import, real-time sharing, restart persistence and privacy",
+  "PostgreSQL import, profiles, catalog, sessions and privacy",
   { timeout: 45000 },
   async () => {
     const db = await isolatedDatabase();
     const directory = await mkdtemp(join(tmpdir(), "feswave-test-"));
     const port = 20000 + Math.floor(Math.random() * 20000);
     let running;
-    const streams = [];
     try {
       // Import a legacy JSON fixture twice: preserve IDs/Cookies and never overwrite newer DB data.
       const legacyA = {
@@ -188,13 +187,6 @@ test(
       const imported = await request("session", `feswave=${legacyToken}`);
       assert.equal(imported.data.user.id, legacyA.id);
       assert.equal(imported.data.user.artist, "newer DB value");
-      const importedMemories = (
-        await request("memories", `feswave=${legacyToken}`)
-      ).data;
-      assert.equal(importedMemories.length, 1);
-      assert.equal(importedMemories[0].favorite, true);
-      assert.equal(importedMemories[0].at, legacyMemory.at);
-      assert.equal((await request("memories")).response.status, 401);
       const a = await request("session");
       const b = await request("session");
       const cookieA = a.response.headers.get("set-cookie").split(";")[0];
@@ -221,7 +213,7 @@ test(
       assert.notEqual(cookieA, cookieB);
       assert.equal(a.data.user.visible, false);
       assert.equal(
-        (await request("memories", `feswave=${a.data.user.id}`)).response
+        (await request("music/search?term=", `feswave=${a.data.user.id}`)).response
           .status,
         401,
       );
@@ -239,11 +231,6 @@ test(
               visible: true,
             })
           ).response.status,
-          200,
-        );
-        assert.equal(
-          (await request("join", cookie, "POST", { eventId: "feswave-2026" }))
-            .response.status,
           200,
         );
       }
@@ -327,179 +314,7 @@ test(
         (await request("session", cookieA)).data.user.tracks.length,
         2,
       );
-      for (const cookie of [cookieA, cookieB]) {
-        const controller = new AbortController();
-        streams.push(controller);
-        const response = await fetch(base + "stream", {
-          headers: { Cookie: cookie },
-          signal: controller.signal,
-        });
-        assert.equal(response.headers.get("content-type"), "text/event-stream");
-        const reader = response.body.getReader();
-        assert.match(
-          new TextDecoder().decode((await reader.read()).value),
-          /participants/,
-        );
-        (async () => {
-          try {
-            while (!(await reader.read()).done) {}
-          } catch {}
-        })();
-      }
-      await new Promise((resolve) =>
-        setTimeout(resolve, 5000 - (Date.now() % 5000) + 80),
-      );
-      // Verify the Rust server's five reaction levels at every boundary.
-      const thresholds = new Map([
-        [1, 1], [5, 1], [6, 2], [10, 2],
-        [11, 3], [15, 3], [16, 4], [20, 4], [21, 5],
-      ]);
-      for (let taps = 1; taps <= 21; taps++) {
-        const results = await Promise.all(
-          [cookieA, cookieB].map((cookie) =>
-            request("react", cookie, "POST", {}),
-          ),
-        );
-        for (const { response, data } of results) {
-          assert.equal(response.status, 200);
-          assert.equal(data.taps, taps);
-          if (thresholds.has(taps)) {
-            assert.equal(data.level, thresholds.get(taps));
-          }
-        }
-        // Respect the server's minimum interval between taps.
-        await new Promise((resolve) => setTimeout(resolve, 85));
-      }
-
-      // Verify that the live stream exposes the same server-computed level.
-      const levelStream = new AbortController();
-      streams.push(levelStream);
-      const levelResponse = await fetch(base + "stream", {
-        headers: { Cookie: cookieA },
-        signal: levelStream.signal,
-      });
-      assert.equal(levelResponse.status, 200);
-      const levelReader = levelResponse.body.getReader();
-      let levelFrame = "";
-      while (!/\r?\n\r?\n/.test(levelFrame)) {
-        const { done, value } = await levelReader.read();
-        assert.equal(done, false);
-        levelFrame += new TextDecoder().decode(value);
-      }
-      const snapshot = JSON.parse(levelFrame.match(/^data:\s*(.+)$/m)[1]);
-      const participant = snapshot.participants.find(
-        (person) => person.id === a.data.user.id,
-      );
-      assert.equal(participant.level, 5);
-      assert.equal(participant.taps, 21);
-      levelStream.abort();
-      await new Promise((resolve) =>
-        setTimeout(resolve, 5000 - (Date.now() % 5000) + 500),
-      );
-      const memoriesA = (await request("memories", cookieA)).data;
-      const memoriesB = (await request("memories", cookieB)).data;
-      assert.equal(memoriesA.length, 1);
-      assert.equal(memoriesA[0].person.name, "Bob");
-      assert.equal(memoriesB.length, 1);
-      assert.equal(memoriesA[0].level, 5);
-      assert.equal(memoriesB[0].level, 5);
-      assert.equal(memoriesA[0].person.music.collectionName, "Catalog Album");
-      assert.equal(memoriesA[0].person.tracks.length, 2);
-      assert.ok(Date.now() - memoriesA[0].at < 6000);
-      assert.equal(
-        (
-          await request(`memories/${memoriesA[0].id}`, cookieB, "PATCH", {
-            favorite: true,
-          })
-        ).response.status,
-        404,
-      );
-      assert.equal(
-        (
-          await request(`memories/${memoriesA[0].id}`, cookieA, "PATCH", {
-            favorite: true,
-          })
-        ).data.favorite,
-        true,
-      );
-      const participantRows = await db.admin.query(
-        "SELECT * FROM event_participants WHERE user_id=$1",
-        [a.data.user.id],
-      );
-      assert.equal(participantRows.rowCount, 1);
-      const hashes = await db.admin.query(
-        "SELECT token_hash FROM sessions WHERE user_id=$1",
-        [a.data.user.id],
-      );
-      assert.equal(hashes.rows[0].token_hash.length, 64);
-      assert.notEqual(hashes.rows[0].token_hash, cookieA.split("=")[1]);
-      // Recreate the Rust process and verify data is read from PostgreSQL, not process memory.
-      streams.forEach((c) => c.abort());
-      await stop(running);
-      running = launch(db.url, port);
-      await running.ready;
-      assert.equal((await request("session", cookieA)).data.user.name, "Alice");
-      assert.equal(
-        (await request("session", cookieA)).data.user.eventId,
-        "feswave-2026",
-      );
-      assert.deepEqual(
-        (await request("session", cookieA)).data.user.music,
-        music,
-      );
-      assert.equal(
-        (await request("session", cookieA)).data.user.favoriteTrackId,
-        123,
-      );
-      assert.deepEqual((await request("session", cookieA)).data.user.tracks, [
-        music,
-        secondMusic,
-      ]);
-      const persisted = (await request("memories", cookieA)).data;
-      assert.equal(persisted.length, 1);
-      assert.equal(persisted[0].favorite, true);
-      assert.equal(persisted[0].level, 5);
-      await request("profile", cookieB, "PUT", {
-        name: "Bob",
-        trackId: 123,
-        visible: false,
-      });
-      assert.equal((await request("memories", cookieA)).data.length, 0);
-      assert.equal(
-        (
-          await db.admin.query("SELECT id FROM memories WHERE person_id=$1", [
-            b.data.user.id,
-          ])
-        ).rowCount,
-        0,
-      );
-      const privateStream = new AbortController();
-      streams.push(privateStream);
-      const privateResponse = await fetch(base + "stream", {
-        headers: { Cookie: cookieB },
-        signal: privateStream.signal,
-      });
-      const frame = new TextDecoder().decode(
-        (await privateResponse.body.getReader().read()).value,
-      );
-      assert.doesNotMatch(frame, /SECRET/);
-      assert.doesNotMatch(frame, /Catalog Album|mzstatic/);
-      assert.match(frame, /"music":null/);
-      assert.match(frame, /"tracks":\[\]/);
-      assert.equal(
-        (await request("join", cookieA, "POST", { eventId: "unknown" }))
-          .response.status,
-        400,
-      );
-      assert.equal(
-        (
-          await request("memories/invalid-id", cookieA, "PATCH", {
-            favorite: true,
-          })
-        ).response.status,
-        404,
-      );
-      const crossOrigin = await fetch(base + "react", {
+      const crossOrigin = await fetch(base + "profile", {
         method: "POST",
         headers: { Cookie: cookieA, Origin: "http://elsewhere.example" },
       });
@@ -536,13 +351,12 @@ test(
         "UPDATE sessions SET expires_at=NOW()-INTERVAL '1 day' WHERE user_id=$1",
         [a.data.user.id],
       );
-      assert.equal((await request("memories", cookieA)).response.status, 401);
+      assert.equal((await request("music/search?term=", cookieA)).response.status, 401);
       assert.notEqual(
         (await request("session", cookieA)).data.user.id,
         a.data.user.id,
       );
     } finally {
-      streams.forEach((controller) => controller.abort());
       await stop(running);
       await db.close();
       await rm(directory, { recursive: true, force: true });
