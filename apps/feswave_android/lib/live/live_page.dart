@@ -27,7 +27,8 @@ class _LivePageState extends ConsumerState<LivePage>
   final game = ResonanceGame();
   late final StreamSubscription<int> flashes;
   int pulse = 0;
-  Timer? demoReset;
+  final demoGauge = ReactionGauge();
+  Timer? demoTick;
   static final demo = [
     (
       Profile(name: 'haru', artist: 'YOASOBI', song: '群青', color: 'pink'),
@@ -84,7 +85,7 @@ class _LivePageState extends ConsumerState<LivePage>
 
   @override
   void dispose() {
-    demoReset?.cancel();
+    demoTick?.cancel();
     flashes.cancel();
     orbit.dispose();
     super.dispose();
@@ -111,18 +112,20 @@ class _LivePageState extends ConsumerState<LivePage>
           ),
     ];
     final reduced = MediaQuery.disableAnimationsOf(context);
-    final taps = session.taps[session.now ~/ slotMs] ?? 0;
-    final level = strength(taps);
+    final gauge = benchmark ? demoGauge : session.gauge;
+    final level = gauge.levelAt(session.now);
     void react() {
-      session.tap();
       if (benchmark) {
-        demoReset?.cancel();
-        demoReset = Timer(
-          Duration(milliseconds: slotMs - session.now % slotMs),
-          () {
-            if (mounted) setState(() {});
-          },
-        );
+        demoGauge.tap(session.now);
+        demoTick ??= Timer.periodic(const Duration(milliseconds: 500), (timer) {
+          if (demoGauge.levelAt(session.now) == 0) {
+            timer.cancel();
+            demoTick = null;
+          }
+          setState(() {});
+        });
+      } else {
+        session.tap();
       }
       setState(() => pulse++);
     }
@@ -405,16 +408,12 @@ class _LivePageState extends ConsumerState<LivePage>
               ],
             ),
             const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    taps == 0 ? 'タップして、盛り上がりをシェア' : '$taps taps · LEVEL $level',
-                    style: noteStyle,
-                  ),
-                ),
-                const Text('5 SEC', style: captionStyle),
-              ],
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                level == 0 ? 'タップして、盛り上がりをシェア' : 'LEVEL $level',
+                style: noteStyle,
+              ),
             ),
             const SizedBox(height: 16),
             DecoratedBox(

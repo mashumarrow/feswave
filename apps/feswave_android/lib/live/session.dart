@@ -17,6 +17,7 @@ enum Gate { checking, blocked, ready }
 class LiveSession extends Notifier<int> with WidgetsBindingObserver {
   late final LiveRadio radio;
   final people = <int, Nearby>{};
+  var gauge = ReactionGauge();
   final taps = <int, int>{};
   final effects = StreamController<int>.broadcast();
   final reads = <(int, bool), Future<Profile>>{};
@@ -133,6 +134,7 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
     retryAfter.clear();
     processed.clear();
     taps.clear();
+    gauge = ReactionGauge();
     lastSlot = now ~/ slotMs;
     radio.publish(me);
     await radio.start(_signal(lastSlot));
@@ -169,7 +171,9 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
   );
   void tap() {
     if (!active) return;
-    final slot = now ~/ slotMs;
+    final time = now;
+    gauge.tap(time);
+    final slot = time ~/ slotMs;
     taps[slot] = (taps[slot] ?? 0) + 1;
     update();
   }
