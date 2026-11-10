@@ -9,11 +9,19 @@
 
 ## 開発
 
+アプリのディレクトリで実行する。UIを調整するときは接続した端末を選び、起動後に `r` でホットリロードする。
+
 ```sh
-mise exec -- dart run build_runner build
-mise exec -- flutter analyze
-mise exec -- flutter test
-mise exec -- flutter build apk --debug
+mise exec -- flutter devices
+mise exec -- flutter run -d DEVICE_ID
+```
+
+Freezed・Driftのモデル定義を変更したときは `mise exec -- dart run build_runner build` を実行し、生成差分もコミットする。静的解析は `mise exec -- flutter analyze`、BLE判定やメモリ保存のテストは `mise exec -- flutter test test/live_test.dart` で個別に実行できる。
+
+push・PR時の自動CIは無効。実機デモ用のarm64 APKはローカルで次のコマンドを実行するか、ワークフローがデフォルトブランチに入った後に GitHub Actions の「Build demo APK」から手動でビルドする。Actionsの成果物名は `feswave-demo-arm64`。
+
+```sh
+mise exec -- flutter build apk --debug --target-platform android-arm64
 ```
 
 距離の仮設定は−72 dBm以上、直近15秒に3件以上、反応区間に観測があること。両者が公開設定でともにタップし、5段階のレベル差が1以内なら受信側が記録する。端末の向き、持ち方、機種により判定は変化する。
