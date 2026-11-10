@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flame/game.dart' show GameWidget;
 import 'package:flutter/material.dart';
+import 'package:mesh_gradient/mesh_gradient.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../profile/models.dart';
@@ -185,8 +186,44 @@ class _LivePageState extends ConsumerState<LivePage>
             children: [
               Positioned.fill(
                 child: RepaintBoundary(
-                  child: CustomPaint(
-                    painter: OrbitGrid(level, reduced ? null : orbit),
+                  child: AnimatedMeshGradient(
+                    key: ValueKey(
+                      reduced || !TickerMode.valuesOf(context).enabled,
+                    ),
+                    seed: reduced || !TickerMode.valuesOf(context).enabled
+                        ? 2.7
+                        : null,
+                    colors: const [
+                      Color(0xff172b44),
+                      Color(0xff579e9a),
+                      Color(0xffbd7083),
+                      Color(0xff47314e),
+                    ],
+                    options: AnimatedMeshGradientOptions(
+                      frequency: 4.4,
+                      amplitude: 5.2,
+                      speed: 1.3,
+                      grain: .12,
+                    ),
+                  ),
+                ),
+              ),
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x70172433),
+                          Colors.transparent,
+                          Color(0x33251c36),
+                          Color(0xe0231d33),
+                        ],
+                        stops: [0, .24, .65, 1],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -203,21 +240,84 @@ class _LivePageState extends ConsumerState<LivePage>
                 ),
               ),
               IgnorePointer(
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: orbit,
+                    builder: (context, _) {
+                      final phase = reduced ? 0.0 : orbit.value * 2 * math.pi;
+                      final span = area.shortestSide * (.54 + .017 * level);
+                      return SizedBox.square(
+                        dimension: span,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            for (int i = 0; i < 3; i++)
+                              Transform.rotate(
+                                angle: i * 1.4 + phase * (i.isEven ? 1 : -1),
+                                child: Transform.scale(
+                                  scale:
+                                      .83 +
+                                      .07 * i +
+                                      .035 * math.sin(phase * 5 + i),
+                                  child: DecoratedBox(
+                                    decoration: ShapeDecoration(
+                                      shape: StarBorder(
+                                        points: 5,
+                                        innerRadiusRatio: .64 + .04 * i,
+                                        pointRounding: .64,
+                                        valleyRounding: .35,
+                                        squash: .64,
+                                      ),
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          pearl.withValues(alpha: .70),
+                                          seaGlass.withValues(alpha: .22),
+                                          stageNight.withValues(alpha: .08),
+                                          apricot.withValues(alpha: .62),
+                                        ],
+                                        stops: const [0, .24, .64, 1],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              IgnorePointer(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: ink,
-                    border: Border.all(color: reactionColors[level], width: 4),
+                    gradient: const SweepGradient(
+                      colors: [
+                        seaGlass,
+                        Color(0xff7478a6),
+                        apricot,
+                        pearl,
+                        seaGlass,
+                      ],
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: reactionColors[level].withValues(alpha: .65),
-                        blurRadius: 28,
+                        color: reactionColors[level].withValues(alpha: .42),
+                        blurRadius: 42,
+                        spreadRadius: 10,
                       ),
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Avatar(session.me, size: 70),
+                    padding: const EdgeInsets.all(4),
+                    child: Avatar(
+                      session.me,
+                      size: 70,
+                      glow: reactionColors[level],
+                    ),
                   ),
                 ),
               ),
@@ -337,7 +437,7 @@ class _LivePageState extends ConsumerState<LivePage>
               Positioned(
                 left: 18,
                 right: 18,
-                top: 12,
+                top: 18,
                 child: IgnorePointer(
                   child: Row(
                     children: [
@@ -345,9 +445,10 @@ class _LivePageState extends ConsumerState<LivePage>
                         child: Text(
                           'FESWAVE',
                           style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            fontStyle: FontStyle.italic,
+                            fontSize: 17,
+                            letterSpacing: 2,
+                            fontWeight: FontWeight.w600,
+                            color: pearl,
                           ),
                         ),
                       ),
@@ -362,7 +463,7 @@ class _LivePageState extends ConsumerState<LivePage>
               Positioned(
                 left: 20,
                 right: 20,
-                bottom: 18,
+                bottom: MediaQuery.paddingOf(context).bottom + 22,
                 child: IgnorePointer(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,19 +472,14 @@ class _LivePageState extends ConsumerState<LivePage>
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'TAP TO REACT',
+                          'Tap to react',
                           style: TextStyle(
-                            fontSize: 44,
-                            height: 1,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -2,
+                            fontSize: 36,
+                            height: 1.12,
+                            color: pearl,
+                            fontFamily: 'serif',
+                            fontWeight: FontWeight.w400,
                             fontStyle: FontStyle.italic,
-                            shadows: [
-                              Shadow(
-                                color: reactionColors[level],
-                                offset: const Offset(3, 3),
-                              ),
-                            ],
                           ),
                         ),
                       ),
@@ -392,17 +488,20 @@ class _LivePageState extends ConsumerState<LivePage>
                         children: [
                           Text(
                             'LEVEL $level',
-                            style: const TextStyle(fontWeight: FontWeight.w900),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(width: 12),
                           for (var i = 1; i <= 5; i++)
                             Expanded(
                               child: Container(
-                                height: 9,
+                                height: 4,
                                 margin: const EdgeInsets.only(right: 4),
-                                color: i <= level
-                                    ? reactionColors[i]
-                                    : Colors.white24,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(4),
+                                  color: i <= level
+                                      ? reactionColors[i]
+                                      : Colors.white24,
+                                ),
                               ),
                             ),
                         ],
@@ -414,44 +513,64 @@ class _LivePageState extends ConsumerState<LivePage>
               ),
               if (memoryPartner != null)
                 IgnorePointer(
-                  child: Transform.rotate(
-                    angle: -.085,
+                  child: Semantics(
+                    liveRegion: true,
                     child:
                         Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          color: const Color(0xffffd934),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                '共感！',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 42,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.15,
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 24,
+                              ),
+                              decoration: const BoxDecoration(
+                                gradient: RadialGradient(
+                                  radius: .9,
+                                  colors: [
+                                    Color(0xec493747),
+                                    Color(0xaa433d51),
+                                    Color(0x00433d51),
+                                  ],
                                 ),
                               ),
-                              Text(
-                                memoryPartner!.isEmpty
-                                    ? 'メモリに保存'
-                                    : '$memoryPartner とメモリに保存',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.favorite_rounded,
+                                    color: apricot,
+                                    size: 24,
+                                  ),
+                                  const Text(
+                                    '共感メモリ',
+                                    style: TextStyle(
+                                      fontSize: 29,
+                                      color: pearl,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    memoryPartner!.isEmpty
+                                        ? '保存しました'
+                                        : '$memoryPartner と一緒に',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: pearl),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ).animate().slideX(
-                          begin: -.9,
-                          end: 0,
-                          duration: 180.ms,
-                          curve: Curves.easeOutCubic,
-                        ),
+                            )
+                            .animate()
+                            .fadeIn(duration: 280.ms)
+                            .scale(
+                              begin: const Offset(.92, .92),
+                              end: const Offset(1, 1),
+                              duration: 420.ms,
+                              curve: Curves.easeOutCubic,
+                            )
+                            .shimmer(
+                              duration: 850.ms,
+                              color: const Color(0x52ffe7c9),
+                            ),
                   ),
                 ),
             ],

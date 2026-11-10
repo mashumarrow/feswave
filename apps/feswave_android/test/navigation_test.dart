@@ -61,7 +61,7 @@ void main() {
         await tester.tapAt(point);
         await tester.pump();
       }
-      await tester.tapAt(tester.getCenter(find.text('TAP TO REACT')));
+      await tester.tapAt(tester.getCenter(find.text('Tap to react')));
       await tester.pump();
       expect(find.text('LEVEL 2'), findsOneWidget);
       await tester.tap(find.text('haru · demo'));

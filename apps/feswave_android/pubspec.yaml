@@ -29,6 +29,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_svg: ^2.3.2
+  mesh_gradient: ^1.3.8
 
 dev_dependencies:
   drift_dev: 2.34.0

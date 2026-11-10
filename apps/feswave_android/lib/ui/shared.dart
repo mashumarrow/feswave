@@ -35,12 +35,13 @@ class WaveIcon extends StatelessWidget {
 }
 
 class Avatar extends StatelessWidget {
-  const Avatar(this.p, {super.key, this.size = 48});
+  const Avatar(this.p, {super.key, this.size = 48, this.glow});
+  final Color? glow;
   final Profile p;
   final double size;
   @override
   Widget build(BuildContext context) {
-    final color = tint(p.color);
+    final color = glow ?? tint(p.color);
     final fallback = DecoratedBox(
       decoration: BoxDecoration(
         gradient: RadialGradient(

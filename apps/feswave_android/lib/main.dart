@@ -72,16 +72,16 @@ class Feswave extends StatelessWidget {
         iconTheme: WidgetStateProperty.resolveWith(
           (s) => IconThemeData(
             color: s.contains(WidgetState.selected)
-                ? const Color(0xffff99f4)
-                : const Color(0xffa293b1),
+                ? const Color(0xffffe3d2)
+                : const Color(0xffd1c2d5),
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (s) => TextStyle(
             fontSize: 11,
             color: s.contains(WidgetState.selected)
-                ? const Color(0xffff99f4)
-                : const Color(0xffa293b1),
+                ? const Color(0xffffe3d2)
+                : const Color(0xffd1c2d5),
           ),
         ),
       ),
@@ -125,8 +125,10 @@ class Shell extends ConsumerWidget {
     final active = ref.watch(
       liveProvider.select((_) => ref.read(liveProvider.notifier).active),
     );
+    final onStage = shell.currentIndex == 0 && active;
     return Scaffold(
-      appBar: shell.currentIndex == 0 && active
+      extendBody: onStage,
+      appBar: onStage
           ? null
           : AppBar(
               backgroundColor: ink,
@@ -169,14 +171,30 @@ class Shell extends ConsumerWidget {
                 ),
               ),
             ),
-      body: SafeArea(child: shell),
+      body: SafeArea(bottom: !onStage, child: shell),
       bottomNavigationBar: NavigationBar(
+        backgroundColor: onStage ? Colors.transparent : ink,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: Colors.transparent,
         selectedIndex: shell.currentIndex,
         onDestinationSelected: shell.goBranch,
         destinations: const [
-          NavigationDestination(icon: WaveIcon('live'), label: 'ライブ'),
-          NavigationDestination(icon: WaveIcon('heart'), label: 'メモリ'),
-          NavigationDestination(icon: WaveIcon('user'), label: 'プロフィール'),
+          NavigationDestination(
+            icon: WaveIcon('live'),
+            selectedIcon: Icon(Icons.graphic_eq_rounded),
+            label: 'ライブ',
+          ),
+          NavigationDestination(
+            icon: WaveIcon('heart'),
+            selectedIcon: Icon(Icons.favorite_rounded),
+            label: 'メモリ',
+          ),
+          NavigationDestination(
+            icon: WaveIcon('user'),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'プロフィール',
+          ),
         ],
       ),
     );
