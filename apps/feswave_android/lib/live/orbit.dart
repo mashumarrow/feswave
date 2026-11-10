@@ -15,8 +15,8 @@ import 'package:flutter/material.dart'
         TextScaler;
 
 double orbitRadius(Size size, double meters) {
-  final outer = math.max(0.0, size.shortestSide / 2 - 40);
-  final inner = math.min(72.0, outer * .48);
+  final outer = math.max(0.0, size.shortestSide / 2 - 28);
+  final inner = math.min(64.0, outer * .40);
   return lerpDouble(inner, outer, (meters.clamp(1.0, 3.0) - 1) / 2)!;
 }
 
@@ -35,20 +35,20 @@ class DistanceRings extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final line = Paint()
-      ..color = pearl.withValues(alpha: .38)
+      ..color = pearl.withValues(alpha: .18)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
+      ..strokeWidth = .75;
     for (var meters = 1; meters <= 3; meters++) {
       final r = orbitRadius(size, meters.toDouble());
       canvas.drawCircle(center, r, line);
       final label = TextPainter(
         text: TextSpan(
-          text: const ['≲1 m', '≈2 m', '≳3 m'][meters - 1],
-          style: const TextStyle(
-            color: pearl,
+          text: '$meters m',
+          style: TextStyle(
+            color: pearl.withValues(alpha: .74),
             fontSize: 11,
-            fontWeight: FontWeight.w600,
-            shadows: [Shadow(color: stageNight, blurRadius: 4)],
+            fontWeight: FontWeight.w500,
+            shadows: const [Shadow(color: stageNight, blurRadius: 4)],
           ),
         ),
         textScaler: scaler,

@@ -470,7 +470,11 @@ class _LivePageState extends ConsumerState<LivePage>
                                     ),
                                     const SizedBox(height: 5),
                                     SizedBox(
-                                      width: 78,
+                                      width: math.min(
+                                        78.0,
+                                        area.width -
+                                            2 * orbitRadius(area, meters),
+                                      ),
                                       child: Text(
                                         !benchmark
                                             ? item.profile.name
