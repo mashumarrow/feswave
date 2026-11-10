@@ -8,6 +8,7 @@ import 'profile/pages.dart';
 import 'memories/page.dart';
 import 'services.dart';
 import 'ui/shared.dart';
+import 'ui/stage.dart';
 
 void main() => runApp(const ProviderScope(child: Feswave()));
 final router = GoRouter(
@@ -30,7 +31,12 @@ final router = GoRouter(
               path: '/profile',
               builder: (_, _) => const ProfilePage(),
               routes: [
-                GoRoute(path: 'edit', builder: (_, _) => const ProfileEditor()),
+                GoRoute(
+                  path: 'edit',
+                  builder: (_, state) => ProfileEditor(
+                    joinAfterSave: state.uri.queryParameters['join'] == '1',
+                  ),
+                ),
               ],
             ),
           ],
@@ -54,8 +60,62 @@ class Feswave extends StatelessWidget {
       ).copyWith(primary: lilac, surface: panel),
       scaffoldBackgroundColor: ink,
       useMaterial3: true,
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
+      dividerColor: const Color(0xff352841),
+      cardTheme: CardThemeData(
+        color: panel,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: const BorderSide(color: Color(0xff412c4c)),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 68,
+        backgroundColor: const Color(0xff100d19),
+        indicatorColor: Colors.transparent,
+        iconTheme: WidgetStateProperty.resolveWith(
+          (s) => IconThemeData(
+            color: s.contains(WidgetState.selected)
+                ? const Color(0xffff99f4)
+                : const Color(0xffa293b1),
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (s) => TextStyle(
+            fontSize: 11,
+            color: s.contains(WidgetState.selected)
+                ? const Color(0xffff99f4)
+                : const Color(0xffa293b1),
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 48),
+          backgroundColor: const Color(0xff67368a),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: Color(0xffad6eca)),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xffe5cfed),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        selectedColor: const Color(0xff46214f),
+        backgroundColor: panel,
+        showCheckmark: false,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xff100d19),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(7)),
       ),
     ),
   );
@@ -85,18 +145,55 @@ class _ShellState extends ConsumerState<Shell> {
         return (s.gate, s.message, s.busy);
       }),
     );
+    final joined = ref.watch(
+      liveProvider.select((_) => ref.read(liveProvider.notifier).joined),
+    );
     final account = ref.watch(accountProvider);
     final ready = state.$1 == Gate.ready && account.hasValue;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: ink,
+        actions: ready
+            ? [
+                Text(
+                  joined ? '●  LIVE' : '●  DEMO MODE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 1,
+                    color: joined ? cyan : pink,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'プロフィール',
+                  onPressed: () => context.go('/profile'),
+                  icon: const Icon(Icons.person_outline, size: 20),
+                ),
+              ]
+            : null,
+        toolbarHeight: 56,
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1),
+        ),
         title: const Row(
           children: [
-            Icon(Icons.graphic_eq_rounded, color: cyan),
+            CustomPaint(size: Size(27, 23), painter: WaveMark(cyan)),
             SizedBox(width: 8),
-            Text(
-              'FESWAVE',
-              style: TextStyle(letterSpacing: 1.8, fontWeight: FontWeight.w900),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: 'FES'),
+                  TextSpan(
+                    text: 'WAVE',
+                    style: TextStyle(color: Color(0xffe477fa)),
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.1,
+                fontSize: 20,
+              ),
             ),
           ],
         ),
@@ -146,7 +243,7 @@ class _ShellState extends ConsumerState<Shell> {
                   label: 'ライブ',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.auto_awesome_outlined),
+                  icon: Icon(Icons.favorite_border),
                   label: 'メモリ',
                 ),
                 NavigationDestination(

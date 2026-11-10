@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../profile/models.dart';
 
-const ink = Color(0xff0b0b15),
-    panel = Color(0xff171625),
-    cyan = Color(0xff52e1eb),
-    pink = Color(0xfff485df),
-    lilac = Color(0xffbca3ff);
+const ink = Color(0xff090911),
+    panel = Color(0xff14111e),
+    cyan = Color(0xff37d5f7),
+    pink = Color(0xfff14be5),
+    lilac = Color(0xffaa75ff);
 Color tint(String color) => switch (color) {
   'blue' => cyan,
   'orange' => const Color(0xffffba76),
@@ -22,13 +22,25 @@ class Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = tint(p.color);
-    final fallback = ColoredBox(
-      color: Color.lerp(panel, color, .18)!,
+    final fallback = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(-.48, -.63),
+          radius: 1.25,
+          colors: [
+            Color.lerp(color, Colors.white, .65)!,
+            color,
+            Color.lerp(color, const Color(0xff180f42), .74)!,
+          ],
+          stops: const [0, .34, 1],
+        ),
+      ),
       child: Center(
         child: Text(
           p.name.isEmpty ? '♪' : p.name.characters.first,
           style: TextStyle(
-            color: color,
+            color: Colors.white,
+            shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
             fontSize: size * .41,
             fontWeight: FontWeight.w700,
           ),
@@ -63,6 +75,49 @@ class Avatar extends StatelessWidget {
     );
   }
 }
+
+Future<void> showPerson(
+  BuildContext context,
+  Profile person, {
+  bool demo = false,
+}) => showDialog<void>(
+  context: context,
+  builder: (context) => Dialog(
+    backgroundColor: panel,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: const BorderSide(color: Color(0xff60406c)),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 4, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  demo ? 'DEMO PARTICIPANT' : 'ON THE SAME WAVE',
+                  style: captionStyle,
+                ),
+              ),
+              IconButton(
+                tooltip: '閉じる',
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, size: 20),
+              ),
+            ],
+          ),
+        ),
+        Flexible(child: ProfileCard(person)),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('閉じる'),
+        ),
+      ],
+    ),
+  ),
+);
 
 class ProfileCard extends StatelessWidget {
   const ProfileCard(this.p, {super.key});
@@ -115,4 +170,103 @@ void notice(BuildContext c, Object message) {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message.toString())));
   }
+}
+
+const captionStyle = TextStyle(
+  fontSize: 10,
+  letterSpacing: 1.4,
+  color: Color(0xffc3a4d4),
+);
+const noteStyle = TextStyle(
+  fontSize: 12,
+  height: 1.6,
+  color: Color(0xffb6a9c2),
+);
+
+class PageHeading extends StatelessWidget {
+  const PageHeading(
+    this.kicker,
+    this.title,
+    this.icon,
+    this.description, {
+    super.key,
+  });
+  final String kicker, title, description;
+  final IconData icon;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 18),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(kicker, style: captionStyle),
+        Row(
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -1,
+              ),
+            ),
+            const SizedBox(width: 9),
+            Icon(icon, color: title == 'Live' ? cyan : pink, size: 26),
+          ],
+        ),
+        Text(description, style: noteStyle),
+      ],
+    ),
+  );
+}
+
+class WavePanel extends StatelessWidget {
+  const WavePanel({super.key, required this.children, this.center = false});
+  final List<Widget> children;
+  final bool center;
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: panel,
+      border: Border.all(color: const Color(0xff35283e)),
+      borderRadius: BorderRadius.circular(11),
+    ),
+    child: Column(
+      crossAxisAlignment: center
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.stretch,
+      children: children,
+    ),
+  );
+}
+
+class WaveFooter extends StatelessWidget {
+  const WaveFooter({super.key});
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      const Text('FESWAVE  © 2026', style: captionStyle),
+      TextButton(
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('音楽でつながる、もっと近くに。'),
+            content: const Text(
+              'ライブ中に気持ちが動いたらタップ。近くにいる参加者と同じ5秒間に盛り上がり、双方が公開を許可していると、端末に共感メモリが残ります。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('閉じる'),
+              ),
+            ],
+          ),
+        ),
+        child: const Text('このアプリについて ↗', style: noteStyle),
+      ),
+    ],
+  );
 }

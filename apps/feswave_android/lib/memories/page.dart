@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services.dart';
@@ -17,7 +18,39 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(20),
     children: [
-      Text('共感メモリ', style: Theme.of(context).textTheme.headlineMedium),
+      const PageHeading(
+        'THE MOMENTS WE SHARED.',
+        'Memory',
+        Icons.favorite_border,
+        'あの瞬間、同じ気持ちだった誰か。',
+      ),
+      WavePanel(
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.favorite_border, size: 36, color: pink),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('YOUR SHARED MOMENTS', style: captionStyle),
+                    Text('音が止まっても、つながりは残る。'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text('近くで同じ5秒間に盛り上がった参加者との記録です。', style: noteStyle),
+          const Divider(),
+          Text(
+            '${ref.watch(historyProvider).value?.length ?? "—"}   MEMORIES',
+            textAlign: TextAlign.center,
+            style: captionStyle,
+          ),
+        ],
+      ),
       const SizedBox(height: 14),
       Wrap(
         spacing: 8,
@@ -30,6 +63,7 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
             ),
         ],
       ),
+      const Text('公開を許可した参加者のみ表示', style: noteStyle),
       const SizedBox(height: 12),
       ...ref
           .watch(historyProvider)
@@ -38,13 +72,24 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
               final list = rows.where((m) => !favorites || m.favorite);
               if (list.isEmpty) {
                 return [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 36),
-                    child: Text(
-                      favorites
-                          ? 'お気に入りのメモリはありません'
-                          : '近くの参加者と同じ時間にリアクションすると、ここに記録されます。',
-                    ),
+                  WavePanel(
+                    center: true,
+                    children: [
+                      const Icon(Icons.favorite_border, color: lilac, size: 32),
+                      const SizedBox(height: 10),
+                      Text(favorites ? '大切なメモリを、お気に入りに。' : '最初の「同じ！」を見つけよう。'),
+                      Text(
+                        favorites
+                            ? 'メモリのハートを押すと、ここに残せます。'
+                            : '双方がプロフィールを公開し、近くで一緒にリアクションすると記録されます。',
+                        style: noteStyle,
+                        textAlign: TextAlign.center,
+                      ),
+                      TextButton(
+                        onPressed: () => context.go('/live'),
+                        child: const Text('ライブに戻る  →'),
+                      ),
+                    ],
                   ),
                 ];
               }
@@ -63,11 +108,7 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
                           subtitle: Text(
                             '${at.toString().substring(0, 16)} · Lv.${m.level}',
                           ),
-                          onTap: () => showModalBottomSheet(
-                            context: context,
-                            showDragHandle: true,
-                            builder: (_) => ProfileCard(p),
-                          ),
+                          onTap: () => showPerson(context, p),
                           trailing: IconButton(
                             tooltip: 'お気に入り',
                             icon: Icon(
@@ -88,6 +129,7 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
             error: (e, _) => [Text('$e')],
             loading: () => [const LinearProgressIndicator()],
           ),
+      const WaveFooter(),
     ],
   );
 }
