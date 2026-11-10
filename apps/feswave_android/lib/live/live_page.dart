@@ -28,7 +28,6 @@ class _LivePageState extends ConsumerState<LivePage>
   )..repeat();
   final game = ResonanceGame();
   late final StreamSubscription<int> flashes;
-  int pulse = 0;
   final demoGauge = ReactionGauge();
   Timer? demoTick, memoryBannerTimer;
   String? memoryPartner;
@@ -156,13 +155,7 @@ class _LivePageState extends ConsumerState<LivePage>
     final reduced = MediaQuery.disableAnimationsOf(context);
     final gauge = benchmark ? demoGauge : session.gauge;
     final level = gauge.levelAt(session.now);
-    final view = View.of(context);
-    final viewportHeight =
-        (view.physicalSize.height -
-            view.viewPadding.top -
-            view.viewPadding.bottom) /
-        view.devicePixelRatio;
-    void react() {
+    void react(Offset position) {
       if (benchmark) {
         demoGauge.tap(session.now);
         demoTick ??= Timer.periodic(const Duration(milliseconds: 500), (timer) {
@@ -177,445 +170,294 @@ class _LivePageState extends ConsumerState<LivePage>
       }
       if (!reduced) {
         final nextLevel = gauge.levelAt(session.now);
-        game.beat(nextLevel, rising: nextLevel > level);
+        game.beat(position, nextLevel, rising: nextLevel > level);
       }
-      setState(() => pulse++);
+      setState(() {});
     }
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 22),
-      children: [
-        const PageHeading('SAME MUSIC. SAME MOMENT.', 'Live', 'wave', ''),
-        WavePanel(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                const WaveIcon('people', size: 16, color: Color(0xffa793b9)),
-                const SizedBox(width: 5),
-                Text(
-                  '${!benchmark ? people.length : items.length}  ${!benchmark ? "LIVE" : "DEMO"}',
-                  style: captionStyle,
-                ),
-              ],
-            ),
-            SizedBox(
-              height: (viewportHeight * .52).clamp(350.0, 460.0),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: FractionallySizedBox(
-                      heightFactor: .92,
-                      alignment: Alignment.topCenter,
-                      child: LayoutBuilder(
-                        builder: (context, c) {
-                          final area = c.biggest;
-                          return DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: const RadialGradient(
-                                colors: [Color(0xff25172f), panel, panel],
-                                radius: .54,
-                              ),
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Positioned.fill(
-                                  child: CustomPaint(
-                                    painter: OrbitGrid(
-                                      level,
-                                      reduced ? null : orbit,
-                                    ),
-                                  ),
-                                ),
-                                for (final item in items)
-                                  TweenAnimationBuilder<double>(
-                                    key: ValueKey(item.id),
-                                    tween: Tween(end: item.near),
-                                    duration: reduced
-                                        ? Duration.zero
-                                        : const Duration(milliseconds: 1200),
-                                    builder: (context, near, _) {
-                                      final diameter = 34 + near * 17;
-                                      return AnimatedBuilder(
-                                        animation: orbit,
-                                        builder: (context, child) {
-                                          final angle = !benchmark
-                                              ? (item.id % 997) *
-                                                    2 *
-                                                    math.pi /
-                                                    997
-                                              : item.id *
-                                                    2 *
-                                                    math.pi /
-                                                    widget.demoCount;
-                                          final point = orbitPoint(
-                                            area,
-                                            reduced ? 0 : orbit.value,
-                                            near,
-                                            angle,
-                                          );
-                                          game.points[item.id] = point;
-                                          return Transform.translate(
-                                            offset:
-                                                point -
-                                                area.center(Offset.zero),
-                                            child: child,
-                                          );
-                                        },
-                                        child: AnimatedOpacity(
-                                          opacity:
-                                              !benchmark &&
-                                                  session.now -
-                                                          (session
-                                                                  .people[item
-                                                                      .id]
-                                                                  ?.last ??
-                                                              session.now) >
-                                                      13500
-                                              ? 0
-                                              : 1,
-                                          duration: reduced
-                                              ? Duration.zero
-                                              : const Duration(
-                                                  milliseconds: 800,
-                                                ),
-                                          child:
-                                              Semantics(
-                                                button: true,
-                                                label:
-                                                    '${item.profile.name}のプロフィール',
-                                                child: GestureDetector(
-                                                  onTap: () async {
-                                                    try {
-                                                      final p = !benchmark
-                                                          ? await session
-                                                                .profileFor(
-                                                                  item.id,
-                                                                )
-                                                          : item.profile;
-                                                      if (context.mounted) {
-                                                        await showPerson(
-                                                          context,
-                                                          p,
-                                                          demo: benchmark,
-                                                        );
-                                                      }
-                                                    } catch (e) {
-                                                      if (context.mounted) {
-                                                        notice(
-                                                          context,
-                                                          'プロフィールを読み込めません。近くでもう一度お試しください。',
-                                                        );
-                                                      }
-                                                    }
-                                                  },
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      DecoratedBox(
-                                                        decoration: BoxDecoration(
-                                                          shape:
-                                                              BoxShape.circle,
-                                                          boxShadow: [
-                                                            if (item.level > 0)
-                                                              BoxShadow(
-                                                                color:
-                                                                    tint(
-                                                                      item
-                                                                          .profile
-                                                                          .color,
-                                                                    ).withValues(
-                                                                      alpha:
-                                                                          .23,
-                                                                    ),
-                                                                blurRadius:
-                                                                    4 +
-                                                                    item.level *
-                                                                        2,
-                                                              ),
-                                                          ],
-                                                        ),
-                                                        child: Avatar(
-                                                          item.profile,
-                                                          size: diameter,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 5),
-                                                      SizedBox(
-                                                        width: 78,
-                                                        child: Text(
-                                                          !benchmark
-                                                              ? item
-                                                                    .profile
-                                                                    .name
-                                                              : "${item.profile.name} · demo",
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 9,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ).animate().fadeIn(
-                                                duration: reduced
-                                                    ? Duration.zero
-                                                    : 320.ms,
-                                              ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                if (!reduced && pulse > 0)
-                                  IgnorePointer(
-                                    child:
-                                        Container(
-                                              width: 80,
-                                              height: 80,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: pink,
-                                                  width: 3.5,
-                                                ),
-                                              ),
-                                            )
-                                            .animate(
-                                              key: ValueKey('ring$pulse'),
-                                            )
-                                            .scale(
-                                              begin: const Offset(.8, .8),
-                                              end: const Offset(1.55, 1.55),
-                                              duration: 360.ms,
-                                            )
-                                            .fadeOut(duration: 360.ms),
-                                  ),
-                                Semantics(
-                                  button: true,
-                                  label: 'リアクション',
-                                  child: GestureDetector(
-                                    onTap: react,
-                                    child:
-                                        Container(
-                                              width: 91,
-                                              height: 91,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: level == 0
-                                                      ? const Color(0xffcf85e0)
-                                                      : reactionColors[level],
-                                                  width: 3.5,
-                                                ),
-                                                gradient: const RadialGradient(
-                                                  center: Alignment(-.25, -.35),
-                                                  radius: .94,
-                                                  colors: [
-                                                    Color(0xff642365),
-                                                    Color(0xff21122e),
-                                                    Color(0xff9748bd),
-                                                  ],
-                                                ),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: reactionColors[level]
-                                                        .withValues(alpha: .48),
-                                                    blurRadius: 19,
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Center(
-                                                child:
-                                                    session
-                                                            .me
-                                                            .favorite
-                                                            ?.artworkUrl !=
-                                                        null
-                                                    ? Avatar(
-                                                        session.me,
-                                                        size: 81,
-                                                      )
-                                                    : WaveIcon(
-                                                        'music',
-                                                        size: 34,
-                                                        color: level == 0
-                                                            ? const Color(
-                                                                0xffbaa3c4,
-                                                              )
-                                                            : reactionColors[level],
-                                                      ),
-                                              ),
-                                            )
-                                            .animate(
-                                              key: ValueKey(pulse),
-                                              target: reduced ? 0 : 1,
-                                            )
-                                            .scale(
-                                              begin: const Offset(.88, .88),
-                                              end: const Offset(1, 1),
-                                              duration: 240.ms,
-                                            ),
-                                  ),
-                                ),
-                                IgnorePointer(
-                                  child: Transform.translate(
-                                    offset: const Offset(0, 60),
-                                    child: Text(
-                                      'YOU   LEVEL $level',
-                                      style: const TextStyle(
-                                        fontSize: 8,
-                                        letterSpacing: 1.4,
-                                        color: Color(0xffc6abc9),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Positioned.fill(
-                                  child: IgnorePointer(
-                                    child: GameWidget(game: game),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final area = constraints.biggest;
+        return SizedBox.fromSize(
+          size: area,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned.fill(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: OrbitGrid(level, reduced ? null : orbit),
                   ),
-                  if (memoryPartner != null)
-                    Positioned(
-                      top: 2,
-                      left: 4,
-                      right: 4,
-                      child: IgnorePointer(
+                ),
+              ),
+              Positioned.fill(
+                child: Semantics(
+                  button: true,
+                  label: 'リアクションを送る',
+                  onTap: () => react(area.center(Offset.zero)),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    excludeFromSemantics: true,
+                    onTapUp: (event) => react(event.localPosition),
+                  ),
+                ),
+              ),
+              IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ink,
+                    border: Border.all(color: reactionColors[level], width: 4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: reactionColors[level].withValues(alpha: .65),
+                        blurRadius: 28,
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Avatar(session.me, size: 70),
+                  ),
+                ),
+              ),
+              for (final item in items)
+                TweenAnimationBuilder<double>(
+                  key: ValueKey(item.id),
+                  tween: Tween(end: item.near),
+                  duration: reduced
+                      ? Duration.zero
+                      : const Duration(milliseconds: 1200),
+                  builder: (context, near, _) {
+                    final diameter = 34 + near * 17;
+                    return AnimatedBuilder(
+                      animation: orbit,
+                      builder: (context, child) {
+                        final angle = !benchmark
+                            ? (item.id % 997) * 2 * math.pi / 997
+                            : item.id * 2 * math.pi / widget.demoCount;
+                        final point = orbitPoint(
+                          area,
+                          reduced ? 0 : orbit.value,
+                          near,
+                          angle,
+                        );
+                        game.points[item.id] = point;
+                        return Transform.translate(
+                          offset: point - area.center(Offset.zero),
+                          child: child,
+                        );
+                      },
+                      child: AnimatedOpacity(
+                        opacity:
+                            !benchmark &&
+                                session.now -
+                                        (session.people[item.id]?.last ??
+                                            session.now) >
+                                    13500
+                            ? 0
+                            : 1,
+                        duration: reduced
+                            ? Duration.zero
+                            : const Duration(milliseconds: 800),
                         child:
                             Semantics(
-                                  liveRegion: true,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xff194961),
-                                          Color(0xff602350),
+                              button: true,
+                              label: '${item.profile.name}のプロフィール',
+                              child: GestureDetector(
+                                onTap: () async {
+                                  try {
+                                    final p = !benchmark
+                                        ? await session.profileFor(item.id)
+                                        : item.profile;
+                                    if (context.mounted) {
+                                      await showPerson(
+                                        context,
+                                        p,
+                                        demo: benchmark,
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      notice(
+                                        context,
+                                        'プロフィールを読み込めません。近くでもう一度お試しください。',
+                                      );
+                                    }
+                                  }
+                                },
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          if (item.level > 0)
+                                            BoxShadow(
+                                              color: tint(
+                                                item.profile.color,
+                                              ).withValues(alpha: .23),
+                                              blurRadius: 4 + item.level * 2,
+                                            ),
                                         ],
                                       ),
-                                      border: Border.all(color: cyan),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
+                                      child: Avatar(
+                                        item.profile,
+                                        size: diameter,
                                       ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    SizedBox(
+                                      width: 78,
                                       child: Text(
-                                        memoryPartner!.isEmpty
-                                            ? '共感メモリが生まれました'
-                                            : '$memoryPartner と共感メモリが生まれました',
-                                        textAlign: TextAlign.center,
-                                        maxLines: 2,
+                                        !benchmark
+                                            ? item.profile.name
+                                            : "${item.profile.name} · demo",
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 9),
                                       ),
                                     ),
-                                  ),
-                                )
-                                .animate()
-                                .fadeIn(duration: 180.ms)
-                                .slideY(begin: -.18, end: 0),
+                                  ],
+                                ),
+                              ),
+                            ).animate().fadeIn(
+                              duration: reduced ? Duration.zero : 320.ms,
+                            ),
                       ),
-                    ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Text(
-                      !benchmark && people.isEmpty
-                          ? '周辺の参加者を待っています。'
-                          : benchmark && pulse > 0
-                          ? 'デモ体験中 · 履歴には保存されません'
-                          : '同じ音楽で、つながっている。',
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: Color(0xffa198af),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
+                    );
+                  },
+                ),
+
+              Positioned.fill(
+                child: IgnorePointer(child: GameWidget(game: game)),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                for (int i = 1; i <= 5; i++) ...[
-                  if (i > 1) const SizedBox(width: 6),
-                  Expanded(
-                    child: Container(
-                      height: 18,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(5),
-                        color: i <= level
-                            ? reactionColors[i]
-                            : const Color(0xff453449),
+              Positioned(
+                left: 18,
+                right: 18,
+                top: 12,
+                child: IgnorePointer(
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'FESWAVE',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
                       ),
-                    ),
+                      Text(
+                        benchmark ? 'デモ · 保存なし' : '${people.length}人が近くにいます',
+                        style: noteStyle,
+                      ),
+                    ],
                   ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                level == 0 ? 'タップして、盛り上がりをシェア' : 'LEVEL $level',
-                style: const TextStyle(fontSize: 9, color: Color(0xffa198af)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: const Color(0xff8649a0)),
-                gradient: const LinearGradient(
-                  colors: [Color(0xff10273b), Color(0xff30132f)],
                 ),
               ),
-              child: TextButton.icon(
-                onPressed: react,
-                style: TextButton.styleFrom(minimumSize: const Size(0, 64)),
-                icon: const WaveIcon('tap', size: 26, color: Color(0xffb3cdf8)),
-                label: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tap to React  ✧',
-                      style: TextStyle(fontSize: 18, color: Colors.white),
-                    ),
-                    Text(
-                      '今の気持ちを、タップで届けよう',
-                      style: TextStyle(fontSize: 9, color: Color(0xffaca0ba)),
-                    ),
-                  ],
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 18,
+                child: IgnorePointer(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'TAP TO REACT',
+                          style: TextStyle(
+                            fontSize: 44,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -2,
+                            fontStyle: FontStyle.italic,
+                            shadows: [
+                              Shadow(
+                                color: reactionColors[level],
+                                offset: const Offset(3, 3),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Text(
+                            'LEVEL $level',
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                          const SizedBox(width: 12),
+                          for (var i = 1; i <= 5; i++)
+                            Expanded(
+                              child: Container(
+                                height: 9,
+                                margin: const EdgeInsets.only(right: 4),
+                                color: i <= level
+                                    ? reactionColors[i]
+                                    : Colors.white24,
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (session.message.isNotEmpty) Text(session.message),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (session.message.isNotEmpty) Text(session.message),
-          ],
-        ),
-        const WaveFooter(),
-      ],
+              if (memoryPartner != null)
+                IgnorePointer(
+                  child: Transform.rotate(
+                    angle: -.085,
+                    child:
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          color: const Color(0xffffd934),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                '共感！',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 42,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.15,
+                                ),
+                              ),
+                              Text(
+                                memoryPartner!.isEmpty
+                                    ? 'メモリに保存'
+                                    : '$memoryPartner とメモリに保存',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ).animate().slideX(
+                          begin: -.9,
+                          end: 0,
+                          duration: 180.ms,
+                          curve: Curves.easeOutCubic,
+                        ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

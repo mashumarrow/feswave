@@ -126,42 +126,49 @@ class Shell extends ConsumerWidget {
       liveProvider.select((_) => ref.read(liveProvider.notifier).active),
     );
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: ink,
-        actions: active
-            ? [
-                Text(
-                  '●  LIVE',
-                  style: TextStyle(fontSize: 10, letterSpacing: 1, color: cyan),
+      appBar: shell.currentIndex == 0 && active
+          ? null
+          : AppBar(
+              backgroundColor: ink,
+              actions: active
+                  ? [
+                      Text(
+                        '●  LIVE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          letterSpacing: 1,
+                          color: cyan,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'プロフィール',
+                        onPressed: () => context.go('/profile'),
+                        icon: const WaveIcon('user', size: 17),
+                      ),
+                    ]
+                  : null,
+              scrolledUnderElevation: 0,
+              titleSpacing: 20,
+              toolbarHeight: 57,
+              bottom: const PreferredSize(
+                preferredSize: Size.fromHeight(1),
+                child: Divider(height: 1),
+              ),
+              title: ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [cyan, pink],
+                ).createShader(bounds),
+                child: const Text(
+                  'FESWAVE',
+                  style: TextStyle(
+                    fontSize: 15,
+                    letterSpacing: 1,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
                 ),
-                IconButton(
-                  tooltip: 'プロフィール',
-                  onPressed: () => context.go('/profile'),
-                  icon: const WaveIcon('user', size: 17),
-                ),
-              ]
-            : null,
-        scrolledUnderElevation: 0,
-        titleSpacing: 20,
-        toolbarHeight: 57,
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1),
-        ),
-        title: ShaderMask(
-          shaderCallback: (bounds) =>
-              const LinearGradient(colors: [cyan, pink]).createShader(bounds),
-          child: const Text(
-            'FESWAVE',
-            style: TextStyle(
-              fontSize: 15,
-              letterSpacing: 1,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
+              ),
             ),
-          ),
-        ),
-      ),
       body: SafeArea(child: shell),
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,

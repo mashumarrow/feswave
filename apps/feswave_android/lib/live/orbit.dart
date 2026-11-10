@@ -27,22 +27,37 @@ class OrbitGrid extends CustomPainter {
     final c = size.center(Offset.zero);
     final phase = (motion?.value ?? 0) * 2 * math.pi;
     final extent = size.shortestSide;
+    final bounds = Offset.zero & size;
+    canvas.drawRect(
+      bounds,
+      Paint()
+        ..shader = Gradient.linear(
+          bounds.topLeft,
+          bounds.bottomRight,
+          [
+            const Color(0xff42215f),
+            const Color(0xff161537),
+            const Color(0xff701a52),
+          ],
+          const [0, .5, 1],
+        ),
+    );
     final beam = Paint();
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     for (final side in [-1, 1]) {
-      final source = Offset(c.dx + side * extent * .43, size.height * .06);
+      final source = Offset(c.dx + side * extent * .43, -size.height * .02);
       final tint = side < 0 ? cyan : pink;
       for (var i = 0; i < 3; i++) {
         final aim = .35 + .18 * i + .16 * math.sin(phase * 5 + side + i * .4);
         final end = source + Offset(-side * aim * extent, size.height * .92);
-        final width = 6.0 + level * 2 + i * 3;
+        final width = extent * (.065 + level * .012 + i * .025);
         beam.shader = Gradient.linear(
           source,
           end,
           [
-            tint.withValues(alpha: .22 + .025 * level),
-            tint.withValues(alpha: .065),
+            tint.withValues(alpha: .52 + .035 * level),
+            tint.withValues(alpha: .19),
             tint.withValues(alpha: 0),
           ],
           [0, .6, 1],
@@ -108,7 +123,8 @@ class _Flash {
 }
 
 class _Beat {
-  _Beat(this.level, this.rising, this.angle);
+  _Beat(this.position, this.level, this.rising, this.angle);
+  final Offset position;
   final int level;
   final bool rising;
   final double angle;
@@ -120,9 +136,9 @@ class ResonanceGame extends FlameGame {
   final List<_Flash> _flashes = [];
   final _beats = <_Beat>[];
   int _beatIndex = 0;
-  void beat(int level, {required bool rising}) {
+  void beat(Offset position, int level, {required bool rising}) {
     if (_beats.length >= 10) _beats.removeAt(0);
-    _beats.add(_Beat(level, rising, ++_beatIndex * 2.4));
+    _beats.add(_Beat(position, level, rising, ++_beatIndex * 2.4));
     resumeEngine();
   }
 
@@ -155,26 +171,63 @@ class ResonanceGame extends FlameGame {
     for (final beat in _beats) {
       final t = beat.age / beat.duration;
       final spread = 1 - (1 - t) * (1 - t);
-      final radius = 46 + spread * (beat.rising ? 93 : 50);
+      final reach = size.length * (.65 + beat.level * .07);
+      final radius = 8 + spread * reach;
+      final origin = beat.position;
       final color = reactionColors[beat.level];
       final paint = Paint()
-        ..color = color.withValues(alpha: (1 - t) * .9)
+        ..color = color.withValues(alpha: (1 - t) * .7)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1 + (1 - t) * 2;
-      if (beat.rising) {
-        canvas.drawCircle(start, radius, paint);
-        canvas.drawCircle(start, radius + 6, paint..strokeWidth = 1);
+        ..strokeWidth = 3 + (1 - t) * 14;
+      canvas.drawCircle(origin, radius, paint);
+      final shards = Path();
+      for (var i = 0; i < 22; i++) {
+        final angle = beat.angle + 2 * math.pi * i / 22;
+        final dir = Offset(math.cos(angle), math.sin(angle));
+        final normal = Offset(-dir.dy, dir.dx);
+        final tip = origin + dir * (radius * (.72 + (i % 4) * .09));
+        final base = origin + dir * (radius * .49);
+        final half = normal * (3 + (1 - t) * (beat.rising ? 12 : 6));
+        shards.moveTo(tip.dx, tip.dy);
+        shards.lineTo(base.dx + half.dx, base.dy + half.dy);
+        shards.lineTo(base.dx - half.dx, base.dy - half.dy);
+        shards.close();
       }
-      final count = beat.rising ? 30 : 14;
-      paint.strokeCap = StrokeCap.round;
-      for (var i = 0; i < count; i++) {
-        final a = beat.angle + 2 * math.pi * i / count;
+      canvas.drawPath(
+        shards,
+        paint
+          ..style = PaintingStyle.fill
+          ..color = Color.lerp(
+            color,
+            const Color(0xffffdb50),
+            .48,
+          )!.withValues(alpha: (1 - t) * .9),
+      );
+    }
+    if (_beats.isNotEmpty) {
+      final last = _beats.last;
+      final energy = (1 - last.age / last.duration) * (.55 + .09 * last.level);
+      final rect = Rect.fromLTWH(0, 0, size.x, size.y);
+      final ink = Paint();
+      for (var i = 0; i < 56; i++) {
+        final a = i * 2 * math.pi / 56;
         final dir = Offset(math.cos(a), math.sin(a));
-        final reach = radius - (i % 3) * 5;
-        canvas.drawLine(
-          start + dir * reach,
-          start + dir * (reach + 2 + (1 - t) * (beat.rising ? 14 : 7)),
-          paint,
+        final extent = math.min(
+          rect.width / (2 * dir.dx.abs()),
+          rect.height / (2 * dir.dy.abs()),
+        );
+        final edge = start + dir * (extent + 12);
+        final tip =
+            start + dir * (extent * (1 - energy * (.25 + (i % 5) * .07)));
+        final half = Offset(-dir.dy, dir.dx) * (5.0 + last.level);
+        ink.color = (i.isEven ? pink : cyan).withValues(alpha: energy * .85);
+        canvas.drawPath(
+          Path()
+            ..moveTo(tip.dx, tip.dy)
+            ..lineTo(edge.dx + half.dx, edge.dy + half.dy)
+            ..lineTo(edge.dx - half.dx, edge.dy - half.dy)
+            ..close(),
+          ink,
         );
       }
     }
