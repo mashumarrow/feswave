@@ -12,6 +12,7 @@ import 'session.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'protocol.dart';
 import 'orbit.dart';
+import 'audio_halo.dart';
 
 class LivePage extends ConsumerStatefulWidget {
   const LivePage({super.key, this.demoCount = 0});
@@ -21,12 +22,32 @@ class LivePage extends ConsumerStatefulWidget {
 }
 
 class _LivePageState extends ConsumerState<LivePage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   AnimationController? _orbit;
   AnimationController get orbit => _orbit ??= AnimationController(
     vsync: this,
     duration: const Duration(seconds: 60),
   )..repeat();
+  late final pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+  );
+  late final pulseScale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(
+        begin: 1.0,
+        end: 1.23,
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 26,
+    ),
+    TweenSequenceItem(
+      tween: Tween(
+        begin: 1.23,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.easeOutBack)),
+      weight: 74,
+    ),
+  ]).animate(pulse);
   final game = ResonanceGame();
   late final StreamSubscription<int> flashes;
   final demoGauge = ReactionGauge();
@@ -76,6 +97,7 @@ class _LivePageState extends ConsumerState<LivePage>
   @override
   void initState() {
     super.initState();
+    pulse.value = 1;
     if (widget.demoCount == 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) ref.read(liveProvider.notifier).check(request: false);
@@ -106,6 +128,7 @@ class _LivePageState extends ConsumerState<LivePage>
     memoryBannerTimer?.cancel();
     demoTick?.cancel();
     flashes.cancel();
+    pulse.dispose();
     _orbit?.dispose();
     super.dispose();
   }
@@ -170,6 +193,7 @@ class _LivePageState extends ConsumerState<LivePage>
         session.tap();
       }
       if (!reduced) {
+        pulse.forward(from: 0);
         final nextLevel = gauge.levelAt(session.now);
         game.beat(position, nextLevel, rising: nextLevel > level);
       }
@@ -240,84 +264,108 @@ class _LivePageState extends ConsumerState<LivePage>
                 ),
               ),
               IgnorePointer(
-                child: RepaintBoundary(
-                  child: AnimatedBuilder(
-                    animation: orbit,
-                    builder: (context, _) {
-                      final phase = reduced ? 0.0 : orbit.value * 2 * math.pi;
-                      final span = area.shortestSide * (.54 + .017 * level);
-                      return SizedBox.square(
-                        dimension: span,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            for (int i = 0; i < 3; i++)
-                              Transform.rotate(
-                                angle: i * 1.4 + phase * (i.isEven ? 1 : -1),
-                                child: Transform.scale(
-                                  scale:
-                                      .83 +
-                                      .07 * i +
-                                      .035 * math.sin(phase * 5 + i),
-                                  child: DecoratedBox(
-                                    decoration: ShapeDecoration(
-                                      shape: StarBorder(
-                                        points: 5,
-                                        innerRadiusRatio: .64 + .04 * i,
-                                        pointRounding: .64,
-                                        valleyRounding: .35,
-                                        squash: .64,
+                child: ScaleTransition(
+                  key: const ValueKey('tap-pulse'),
+                  scale: pulseScale,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IgnorePointer(
+                        child: RepaintBoundary(
+                          child: AnimatedBuilder(
+                            animation: orbit,
+                            builder: (context, _) {
+                              final phase = reduced
+                                  ? 0.0
+                                  : orbit.value * 2 * math.pi;
+                              final span =
+                                  area.shortestSide * (.54 + .017 * level);
+                              return SizedBox.square(
+                                dimension: span,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    for (int i = 0; i < 3; i++)
+                                      Transform.rotate(
+                                        angle:
+                                            i * 1.4 +
+                                            phase * (i.isEven ? 1 : -1),
+                                        child: Transform.scale(
+                                          scale:
+                                              .83 +
+                                              .07 * i +
+                                              .035 * math.sin(phase * 5 + i),
+                                          child: DecoratedBox(
+                                            decoration: ShapeDecoration(
+                                              shape: StarBorder(
+                                                points: 5,
+                                                innerRadiusRatio: .64 + .04 * i,
+                                                pointRounding: .64,
+                                                valleyRounding: .35,
+                                                squash: .64,
+                                              ),
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: [
+                                                  pearl.withValues(alpha: .70),
+                                                  seaGlass.withValues(
+                                                    alpha: .22,
+                                                  ),
+                                                  stageNight.withValues(
+                                                    alpha: .08,
+                                                  ),
+                                                  apricot.withValues(
+                                                    alpha: .62,
+                                                  ),
+                                                ],
+                                                stops: const [0, .24, .64, 1],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          pearl.withValues(alpha: .70),
-                                          seaGlass.withValues(alpha: .22),
-                                          stageNight.withValues(alpha: .08),
-                                          apricot.withValues(alpha: .62),
-                                        ],
-                                        stops: const [0, .24, .64, 1],
-                                      ),
-                                    ),
-                                  ),
+                                  ],
                                 ),
-                              ),
-                          ],
+                              );
+                            },
+                          ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const SweepGradient(
-                      colors: [
-                        seaGlass,
-                        Color(0xff7478a6),
-                        apricot,
-                        pearl,
-                        seaGlass,
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: reactionColors[level].withValues(alpha: .42),
-                        blurRadius: 42,
-                        spreadRadius: 10,
+                      ),
+                      IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const SweepGradient(
+                              colors: [
+                                seaGlass,
+                                Color(0xff7478a6),
+                                apricot,
+                                pearl,
+                                seaGlass,
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: reactionColors[level].withValues(
+                                  alpha: .42,
+                                ),
+                                blurRadius: 42,
+                                spreadRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Avatar(
+                              session.me,
+                              size: 70,
+                              glow: reactionColors[level],
+                            ),
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Avatar(
-                      session.me,
-                      size: 70,
-                      glow: reactionColors[level],
-                    ),
                   ),
                 ),
               ),
@@ -452,8 +500,13 @@ class _LivePageState extends ConsumerState<LivePage>
                           ),
                         ),
                       ),
+                      const Icon(Icons.people_outline, size: 17, color: pearl),
+                      const SizedBox(width: 5),
                       Text(
-                        benchmark ? 'デモ · 保存なし' : '${people.length}人が近くにいます',
+                        benchmark ? 'DEMO' : '${people.length}',
+                        semanticsLabel: benchmark
+                            ? 'デモ · 保存なし'
+                            : '近くの参加者 ${people.length}人',
                         style: noteStyle,
                       ),
                     ],
@@ -511,6 +564,7 @@ class _LivePageState extends ConsumerState<LivePage>
                   ),
                 ),
               ),
+              if (!benchmark) const Positioned.fill(child: AudioHalo()),
               if (memoryPartner != null)
                 IgnorePointer(
                   child: Semantics(
@@ -548,14 +602,13 @@ class _LivePageState extends ConsumerState<LivePage>
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  Text(
-                                    memoryPartner!.isEmpty
-                                        ? '保存しました'
-                                        : '$memoryPartner と一緒に',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: pearl),
-                                  ),
+                                  if (memoryPartner!.isNotEmpty)
+                                    Text(
+                                      memoryPartner!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: pearl),
+                                    ),
                                 ],
                               ),
                             )

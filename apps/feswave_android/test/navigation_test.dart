@@ -64,6 +64,13 @@ void main() {
       await tester.tapAt(tester.getCenter(find.text('Tap to react')));
       await tester.pump();
       expect(find.text('LEVEL 2'), findsOneWidget);
+      final pulse = tester.widget<ScaleTransition>(
+        find.byKey(const ValueKey('tap-pulse')),
+      );
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(pulse.scale.value, greaterThan(1.18));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(pulse.scale.value, closeTo(1, .001));
       await tester.tap(find.text('haru · demo'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
