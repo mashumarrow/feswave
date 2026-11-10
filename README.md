@@ -1,58 +1,76 @@
 # FESWAVE
 
-ライブ会場で近くの人を見つけ、一緒に盛り上がった瞬間をスマホに残すAndroidアプリ。
+![FESWAVE](apps/feswave_android/assets/feswave.svg)
 
-| ディレクトリ | 担当 |
-| --- | --- |
-| [apps/feswave_android](apps/feswave_android) | Flutterアプリ。BLE広告で参加者の発見・反応交換、GATTで公開プロフィールを取得。共感メモリは端末のSQLiteに保存 |
-| [services/api](services/api) | 既存Web版と同じ認証・曲検索・プロフィールのHTTP API。Rust、Axum、PostgreSQL |
+ライブで思わず手を叩きたくなった瞬間に、スマホの画面をタップ。近くの人も同じタイミングで盛り上がると、その人の好きな曲が「共感メモリ」として端末に残ります。Android向けのオープンソースアプリです。
 
-## スマホで試す
+[デモAPKをダウンロード](https://github.com/mashumarrow/feswave/releases/download/v0.1.0/feswave-demo-arm64.apk) · [リリース一覧](https://github.com/mashumarrow/feswave/releases) · [MITライセンス](LICENSE)
 
-Android 12以上の広告・スキャン対応端末を2台用意する。各端末でBluetoothと位置情報をオンにする。初回は「ライブを始める」を押し、付近のデバイスと正確な位置情報を許可する。許可済みなら、ライブを開くと広告とスキャンが自動で始まる。メモリとプロフィールはBluetoothがオフでも利用できる。名前は後からプロフィールで登録できる。メモリを作る場合は「好きな曲とアイコンを公開」を両端末でオンにする。近くで同じ5秒間にライブ画面の背景をタップすると、条件を満たした受信側に共感メモリが残る。
+## 2台で試す
+
+デモAPKはarm64用のデバッグビルドです。Android 12以上で、Bluetooth LE（BLE）の広告とスキャンに対応するスマホを2台用意します。ライブと共感メモリは、ゲストのままサーバーなしで試せます。
+
+1. 両方の端末にAPKをインストールし、Bluetooth・位置情報・自動日時設定をオンにします。
+2. プロフィールで「好きな曲とアイコンを公開」をオンにします。デモAPKでは、インターネットに接続すると公開APIで曲を検索できます。
+3. 「ライブを始める」を押し、付近のデバイスと正確な位置情報の権限を許可します。2台を近くに置き、ライブ画面に相手が現れるまで待ちます。
+4. 2台でライブ画面を同じタイミングでタップします。近接とリアクションの条件を満たすと、受信した端末の「メモリ」で記録を見返せます。
+
+ライブ画面右上のマイクをオンにすると、周囲の音の周波数に合わせて中央のリングが動きます。音声は端末内で解析し、保存・送信しません。
+
+## 共感メモリができる仕組み
+
+端末はBLE広告で一時IDと5秒ごとの反応レベルを交換します。ライブ画面では電波が強い相手ほど中心に近く表示されます。円周上の位置は演出です。
+
+両者が公開設定で、同じ5秒区間にタップし、5段階の反応レベルの差が1以内なら、受信側が近接条件を確認します。直近15秒に3件以上の観測があり、受信強度の中央値が−72 dBm以上で、反応した区間にも受信できていれば、公開プロフィールをGATTで読み取り、端末内のSQLiteに保存します。
+
+Pixel 4とRedmi Note 10 JEを使った各距離1回の試験では、1 mで両方にメモリが残り、2 mでは両方とも保存されませんでした。電波強度は機種や持ち方で変わります。[実測値と試験条件](apps/feswave_android/verification/README.md)
+
+## ソースから起動する
+
+Android SDK、JDK 17、miseを用意し、USBデバッグを有効にした端末を接続します。Flutterのバージョンはリポジトリで固定しています。
 
 ```sh
-cd apps/feswave_android
+git clone https://github.com/mashumarrow/feswave.git
+cd feswave/apps/feswave_android
+mise trust
 mise install
-mise exec -- flutter pub get
-mise exec -- flutter build apk --debug
-adb -s <serial> install -r build/app/outputs/flutter-apk/app-debug.apk
+mise exec -- flutter pub get --enforce-lockfile
+mise exec -- flutter devices
+mise exec -- flutter run -d DEVICE_ID
 ```
 
-ライブ中に右上のマイクアイコンを押してマイクを許可すると、中央のリングが周囲の音の周波数に合わせて動く。音声は端末内で解析し、保存・送信しない。タップによる脈動はマイクがオフでも使える。
+`DEVICE_ID` は直前のコマンドに表示された端末IDに置き換えます。[Androidアプリの構成・APKビルド手順](apps/feswave_android/README.md)
 
-## 曲検索・プロフィール同期
+### 曲検索とプロフィール同期
 
-PostgreSQLをインストール済みの開発PCでは以下を実行する。Dockerの場合はAPIディレクトリで.env.exampleを.envへコピーし、接続情報を設定して docker compose up -d --wait db を実行する。
+Rust（Cargo）とDocker Composeを用意し、リポジトリのルートから次を実行します。APIは起動時にPostgreSQLのマイグレーションを適用します。曲検索にはiTunesへのインターネット接続が必要です。
 
 ```sh
 cd services/api
-node scripts/db-local.mjs
+cp .env.example .env
+docker compose up -d --wait db
 cargo run --locked
 ```
 
-USBデバッグでは各端末で `adb -s <serial> reverse tcp:3000 tcp:3000` を実行する。デバッグAPKの既定接続先は http://127.0.0.1:3000/api/ 。公開環境では `flutter build apk --dart-define=API_BASE_URL=https://your-host/api/` とし、配布用署名を別途設定する。
+ローカルのPostgreSQLを使う場合は、上のコピーとComposeの代わりに `node scripts/db-local.mjs` を実行すると、専用DBと接続設定を作成できます（Node.js 22以上）。
 
-Googleログインを使う場合は、アプリID jp.feswave.feswave_android とAPK署名のSHA-1に対応するAndroid OAuthクライアントを登録する。同じGoogle CloudプロジェクトのWebクライアントIDをAPI側の GOOGLE_CLIENT_ID に設定する。HTTPS環境では COOKIE_SECURE=true とする。認証の設定がない環境でもゲスト参加と曲検索を利用できる。
+ソースから起動した場合の既定のAPI接続先は `http://127.0.0.1:3000/api/` です。USB接続では別のターミナルから端末ごとに `adb -s DEVICE_ID reverse tcp:3000 tcp:3000` を実行します。別のサーバーに接続する場合は、ビルド時に `--dart-define=API_BASE_URL=https://your-host/api/` を指定します。
 
-DBマイグレーションは `services/api/migrations` に置く。適用済みの番号と内容は維持し、新規ファイルには未使用の次の番号を使う。
+Googleログインを使う場合は、アプリID `jp.feswave.feswave_android` とAPK署名のSHA-1に対応するAndroid OAuthクライアントを登録し、同じGoogle CloudプロジェクトのWebクライアントIDをAPIの `GOOGLE_CLIENT_ID` に設定します。HTTPSで公開する場合は `COOKIE_SECURE=true` を設定し、APKには配布用の署名を設定してください。
 
-## 本番APIのデプロイ
+配布用APKは東京リージョンのCloud Run上のAPIを使用します。[本番構成とデプロイ手順](infra/README.md)
 
-本番はGCPプロジェクト `feswave` の東京リージョンを使う。Cloud RunがRust APIを実行し、Cloud SQL for PostgreSQL 17にUnixソケット経由で接続する。配布用APKの接続先は `https://feswave-api-933816421570.asia-northeast1.run.app/api/`。ローカルのUSBデバッグは上記の手順を使う。
+## 開発に参加する
 
-- Pull RequestではTerraformの書式・構成、PostgreSQLを使うAPIテスト、コンテナビルドを検証する。
-- `services/api/`、`infra/`、APIワークフローの変更がmainに入ると、GitHub Actionsの「FESWAVE API」がテスト、Artifact Registryへのpush、Terraformのplan・apply、公開 `/healthz` のDB疎通確認を順に行う。手動再実行もmainを指定する。
-- 通常の本番構成は `infra/production` で変更する。DBのパスワードを含むstateは非公開のバージョニング付きGCSバケットに置き、APIはSecret Managerのバージョンを参照する。既存DBへのマイグレーションは旧リビジョンと共存できる変更にする。
-- 認証基盤、stateバケット、イメージリポジトリは管理者が `infra/bootstrap` で管理する。bootstrapのstateも同じバケットの専用prefixに保存する。管理者の再適用手順は次のとおり。GitHubはmainのデプロイワークフローだけがWorkload Identity Federationで認証できる。
-- Googleログインを有効化するときはGitHubのproduction環境変数 `GOOGLE_CLIENT_ID` にWebクライアントIDを設定し、ワークフローを再実行する。
+不具合や機能の提案は [Issues](https://github.com/mashumarrow/feswave/issues) へ。Bluetooth関連の報告には、端末機種・Androidバージョン・2台の距離・どちらの端末に何が表示されたかを添えてください。
 
-```sh
-cd infra
-mise install
-gcloud auth application-default login
-mise exec -- terraform -chdir=bootstrap init -backend-config=bucket=feswave-feswave-tfstate
-mise exec -- terraform -chdir=bootstrap apply -var=project_id=feswave
-```
+| 変更箇所 | 検証方法 |
+| --- | --- |
+| [Flutterアプリ](apps/feswave_android) | 同ディレクトリで `mise exec -- flutter analyze` と `mise exec -- flutter test` |
+| [Rust API](services/api) | 開発用DBを起動し、同ディレクトリで `npm ci` と `npm test`（Node.js 22以上） |
 
-空のプロジェクトから再構築するときは、先に `gcloud storage buckets create gs://PROJECT_ID-feswave-tfstate --project=PROJECT_ID --location=asia-northeast1 --uniform-bucket-level-access` でstate用バケットを作り、bootstrapのinit後に `terraform -chdir=bootstrap import -var=project_id=PROJECT_ID google_storage_bucket.state PROJECT_ID-feswave-tfstate` で取り込む。プロジェクトを移す場合はワークフローのプロジェクトID・番号とAPKの接続先も合わせて更新する。
+DB変更は [migrations](services/api/migrations) に次の未使用番号のSQLファイルとして追加します。
+
+## ライセンス
+
+FESWAVEのソースコードは [MIT License](LICENSE) で公開しています。依存ライブラリにはそれぞれのライセンスが適用されます。Googleのロゴ、曲のジャケット画像などの第三者素材は各権利者に帰属します。
