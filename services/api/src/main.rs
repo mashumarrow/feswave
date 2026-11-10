@@ -480,8 +480,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+async fn health(State(app): State<Shared>) -> ApiResult<StatusCode> {
+    sqlx::query("SELECT 1").execute(&app.store.pool).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 fn router(app: Shared) -> Router {
     Router::new()
+        .route("/healthz", get(health))
         .route("/api/session", get(session))
         .route("/api/auth/google", post(google_login))
         .route("/api/auth/challenge", post(google_challenge))

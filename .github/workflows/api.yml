@@ -1,0 +1,105 @@
+name: FESWAVE API
+
+on:
+  pull_request:
+    paths: &api_paths
+      - 'services/api/**'
+      - 'infra/**'
+      - '.github/workflows/api.yml'
+  push:
+    branches: [main]
+    paths: *api_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  TF_VAR_project_id: feswave
+  TF_VAR_region: asia-northeast1
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+      - name: Validate Terraform
+        run: |
+          terraform fmt -check -recursive infra
+          for dir in infra/bootstrap infra/production; do
+            terraform -chdir="$dir" init -backend=false -lockfile=readonly
+            terraform -chdir="$dir" validate
+          done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test API with PostgreSQL
+        working-directory: services/api
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:ci@localhost:5432/postgres
+        run: |
+          rustup override set 1.98.0
+          npm ci
+          npm test
+      - name: Build runtime image
+        if: github.event_name == 'pull_request'
+        run: docker build services/api
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: feswave-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: ${{ steps.release.outputs.url }}
+    env:
+      TF_VAR_google_client_id: ${{ vars.GOOGLE_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release image
+        run: docker build -t feswave-api services/api
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: feswave
+          workload_identity_provider: projects/933816421570/locations/global/workloadIdentityPools/feswave-github/providers/actions
+          service_account: feswave-deploy@feswave.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v3
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+          terraform_wrapper: false
+      - name: Push image and capture digest
+        run: |
+          registry="$TF_VAR_region-docker.pkg.dev"
+          image="$registry/$TF_VAR_project_id/feswave/api"
+          gcloud auth configure-docker "$registry" --quiet
+          docker tag feswave-api "$image:$GITHUB_SHA"
+          docker push "$image:$GITHUB_SHA"
+          echo "TF_VAR_image=$(docker inspect --format '{{index .RepoDigests 0}}' "$image:$GITHUB_SHA")" >> "$GITHUB_ENV"
+      - name: Apply production infrastructure
+        id: release
+        working-directory: infra/production
+        run: |
+          terraform init -lockfile=readonly -backend-config="bucket=$TF_VAR_project_id-feswave-tfstate"
+          terraform plan -input=false -lock-timeout=5m -out=release.tfplan
+          terraform apply -input=false -lock-timeout=5m release.tfplan
+          url=$(terraform output -raw url)
+          curl --fail --silent --show-error --retry 4 "$url/healthz"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
