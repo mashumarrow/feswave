@@ -46,6 +46,8 @@ Pixel 4とRedmi Note 10 JEで距離を変えて各1回試したところ、1 m�
 | 曲検索・プロフィール同期 | Cloud Run上でRustのAPI（Axum・Tokio）が動きます。曲検索にはiTunes Search APIを使い、プロフィールはCloud SQLのPostgreSQLに保存します。 |
 
 [![Android端末間の通信、端末内の保存先、本番APIとデプロイの構成](docs/images/stack.png)](docs/images/stack.png)
+<img width="1536" height="989" alt="image" src="https://github.com/user-attachments/assets/811e2c28-1db5-4880-bba8-45a5db6ad445" />
+
 
 [端末間通信・音声解析・認証の詳細図](docs/images/runtime.png) · [開発ガイド](docs/development.md) · [本番環境の構成](infra/README.md)
 
