@@ -167,9 +167,7 @@ function closeModal() {
   $<HTMLDialogElement>("#modal").close();
 }
 const closeButton = `<button class="modal-close" data-action="close" aria-label="閉じる">${icon("close")}</button>`;
-function currentEvent() {
-  return state.events.find((e) => e.id === state.eventId);
-}
+
 
 function navigate(page: string) {
   if (!["live", "memory", "profile"].includes(page)) return;
@@ -199,23 +197,6 @@ function renderIdentity() {
     `${avatarArtwork(state.user?.music)}<span class="avatar-fallback">${escape(state.user?.name?.slice(0, 1) || "♪")}</span>`;
   $("#orb .orb-inner").innerHTML =
     `${avatarArtwork(state.user?.music)}${icon("music")}`;
-  $("#join-label").textContent = state.demo
-    ? "ライブに参加する"
-    : "参加中 · イベントを見る";
-  $("#event-kicker").textContent = state.demo
-    ? "TODAY'S PICK"
-    : "YOU ARE IN THIS WAVE";
-}
-function renderEvent() {
-  const event = currentEvent();
-  if (!event) return;
-  $("#event-name").textContent = event.name;
-  if (event.id === "feswave-2026")
-    $("#event-name").insertAdjacentHTML("beforeend", "<span>2026</span>");
-  $("#event-subtitle").textContent = event.subtitle;
-  $("#event-venue").textContent = event.venue;
-  $("#event-date").textContent = event.date;
-  renderIdentity();
 }
 function setConnection(status: string) {
   state.connected = status === "online";
@@ -233,7 +214,7 @@ function connect() {
     if (data.eventId !== state.eventId) {
       state.eventId = data.eventId;
       if (state.user) state.user.eventId = data.eventId;
-      renderEvent();
+      renderIdentity();
     }
     state.participants = data.participants;
     const me = data.participants.find((p) => p.id === state.user?.id);
@@ -317,7 +298,7 @@ async function react() {
     renderMeter();
     renderBubbles();
     if (state.taps === 1)
-      toast("デモリアクション！「ライブに参加する」から共有を始めよう");
+      toast("デモリアクション！履歴には保存されません");
     return;
   }
   if (!state.connected) {
@@ -370,7 +351,7 @@ function showReady() {
 async function joinEvent() {
   if (!state.user?.name) return profileForm(true);
   const buttons = $$<HTMLButtonElement>(
-    '[data-action="enter-live"], [data-action="join"]',
+    '[data-action="enter-live"]',
   );
   buttons.forEach((b) => (b.disabled = true));
   try {
@@ -384,7 +365,7 @@ async function joinEvent() {
     state.level = 0;
     state.participants = [];
     closeModal();
-    renderEvent();
+    renderIdentity();
     renderBubbles();
     renderMeter();
     connect();
@@ -539,10 +520,6 @@ document.addEventListener("click", async (event) => {
     case "close":
       closeModal();
       break;
-    case "join":
-      if (state.loading) toast("接続を準備しています");
-      else if (state.demo) joinEvent();
-      break;
     case "enter-live":
       joinEvent();
       break;
@@ -598,11 +575,6 @@ $<HTMLDialogElement>("#modal").addEventListener("click", (event) => {
       closeModal();
   }
 });
-$("#crowd").innerHTML = Array.from(
-  { length: 42 },
-  (_, i) =>
-    `<i class="crowd-person" style="left:${i * 2.5}%;height:${22 + ((i * 17) % 26)}px;transform:scale(${0.65 + (i % 4) * 0.16}) rotate(${(i % 5) * 4 - 8}deg)"></i>`,
-).join("");
 $(".today").textContent = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "2-digit",
@@ -662,7 +634,7 @@ try {
     state.demo = false;
     connect();
   }
-  renderEvent();
+  renderIdentity();
   renderBubbles();
   renderProfile();
   await refreshMemories();

@@ -19,9 +19,10 @@ h1 { font-size: 30px; }
 .event-kicker { font-size: 8px; }
 .event-meta { font-size: 8px; letter-spacing: .5px; }
 .join-btn { min-height: 44px; font-size: 11px; min-width: 155px; }
-.panel-heading { padding: 18px 18px 0; }
+.live-grid { grid-template-columns: minmax(0, 1fr); }
+.panel-heading { padding: 18px 18px 0; justify-content: flex-end; }
 .panel-heading h2 { font-size: 14px; }
-.wave-stage { height: clamp(210px, 29svh, 260px); }
+.wave-stage { height: clamp(350px, 52svh, 460px); }
 .live-label, .people-count small { font-size: 8px; }
 .reaction-controls { padding: 12px 20px 16px; }
 .tap-button { min-height: 64px; touch-action: manipulation; }
@@ -38,7 +39,9 @@ h1 { font-size: 30px; }
 .level-bars i.lit:nth-child(n) { background: var(--reaction-color); box-shadow: 0 0 6px var(--reaction-color); }
 .panel-footer .legend-dot { background: var(--reaction-color); }
 .tap-button small { font-size: 9px; }
-.reaction-meter { font-size: 9px; gap: 7px; }
+.reaction-meter { display: grid; grid-template-columns: minmax(0, 1fr) auto; font-size: 9px; gap: 10px 7px; margin: 0 0 16px; }
+.level-bars { grid-column: 1 / -1; display: flex; gap: 6px; width: 100%; }
+.level-bars i { flex: 1; width: auto; height: 18px; border-radius: 5px; }
 .reaction-meter > span:last-child { font-size: 8px; }
 .tap-key { display: none; }
 .panel-footer { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin-inline: 18px; }
