@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'live/live_page.dart';
+import 'live/session.dart';
 import 'profile/pages.dart';
 import 'memories/page.dart';
 import 'ui/shared.dart';
@@ -116,20 +117,61 @@ class Feswave extends StatelessWidget {
   );
 }
 
-class Shell extends StatelessWidget {
+class Shell extends ConsumerWidget {
   const Shell({super.key, required this.shell});
   final StatefulNavigationShell shell;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(child: shell),
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: shell.currentIndex,
-      onDestinationSelected: shell.goBranch,
-      destinations: const [
-        NavigationDestination(icon: WaveIcon('live'), label: 'ライブ'),
-        NavigationDestination(icon: WaveIcon('heart'), label: 'メモリ'),
-        NavigationDestination(icon: WaveIcon('user'), label: 'プロフィール'),
-      ],
-    ),
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref.watch(
+      liveProvider.select((_) => ref.read(liveProvider.notifier).active),
+    );
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: ink,
+        actions: active
+            ? [
+                Text(
+                  '●  LIVE',
+                  style: TextStyle(fontSize: 10, letterSpacing: 1, color: cyan),
+                ),
+                IconButton(
+                  tooltip: 'プロフィール',
+                  onPressed: () => context.go('/profile'),
+                  icon: const WaveIcon('user', size: 17),
+                ),
+              ]
+            : null,
+        scrolledUnderElevation: 0,
+        titleSpacing: 20,
+        toolbarHeight: 57,
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1),
+        ),
+        title: ShaderMask(
+          shaderCallback: (bounds) =>
+              const LinearGradient(colors: [cyan, pink]).createShader(bounds),
+          child: const Text(
+            'FESWAVE',
+            style: TextStyle(
+              fontSize: 15,
+              letterSpacing: 1,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+      body: SafeArea(child: shell),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: shell.currentIndex,
+        onDestinationSelected: shell.goBranch,
+        destinations: const [
+          NavigationDestination(icon: WaveIcon('live'), label: 'ライブ'),
+          NavigationDestination(icon: WaveIcon('heart'), label: 'メモリ'),
+          NavigationDestination(icon: WaveIcon('user'), label: 'プロフィール'),
+        ],
+      ),
+    );
+  }
 }

@@ -18,7 +18,67 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 22),
     children: [
-      const PageHeading('共感メモリ'),
+      const PageHeading(
+        'THE MOMENTS WE SHARED.',
+        'Memory',
+        'heart',
+        'あの瞬間、同じ気持ちだった誰か。',
+      ),
+      WavePanel(
+        padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 23),
+        children: [
+          const Row(
+            children: [
+              WaveIcon('heart', size: 38, color: Color(0xfff087ec)),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'YOUR SHARED MOMENTS',
+                      style: TextStyle(
+                        fontSize: 8,
+                        letterSpacing: 1,
+                        color: Color(0xffa397b6),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      '音が止まっても、つながりは残る。',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      '近くで同じ5秒間に盛り上がった参加者との記録です。',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.8,
+                        color: Color(0xff9783a7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 30),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '${ref.watch(historyProvider).value?.length ?? "—"}',
+                style: const TextStyle(fontSize: 32, color: Color(0xffedbbfa)),
+              ),
+              const SizedBox(width: 12),
+              const Text('MEMORIES', style: captionStyle),
+            ],
+          ),
+        ],
+      ),
       Wrap(
         spacing: 8,
         children: [
@@ -107,6 +167,7 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
             ],
             loading: () => [const LinearProgressIndicator()],
           ),
+      const WaveFooter(),
     ],
   );
 }

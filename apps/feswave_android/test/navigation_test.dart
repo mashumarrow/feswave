@@ -56,10 +56,14 @@ void main() {
     await tester.tap(find.text('お気に入り'));
     await tester.pumpAndSettle();
     expect(find.text('お気に入りはまだありません'), findsOneWidget);
+    await tester.ensureVisible(find.text('すべてのメモリを見る'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('すべてのメモリを見る'));
     await tester.pumpAndSettle();
     expect(find.text('共感メモリはまだありません'), findsOneWidget);
     await tester.tap(find.text('プロフィール').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('プロフィールを作成'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('プロフィールを作成'));
     await tester.pumpAndSettle();
