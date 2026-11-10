@@ -90,4 +90,16 @@ dialog { width: min(398px, calc(100vw - 24px)); max-height: calc(100dvh - 28px);
   .reaction-meter { font-size: 8px; }
   .event-meta { font-size: 7px; }
 }
+.account-card { padding: 22px; margin-bottom: 18px; }
+.account-card h2 { font-size: 17px; margin: 12px 0; }
+.account-card p { font-size: 12px; line-height: 1.8; color: var(--muted, #a8a2b8); overflow-wrap: anywhere; }
+.account-card .account-hint { font-size: 11px; margin: 10px 0 0; }
+.google-login { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 48px; margin-top: 18px; background: #fff; color: #1f1f1f; border: 1px solid #747775; border-radius: 24px; font: 500 14px system-ui, sans-serif; cursor: pointer; }
+.google-login > img { width: 20px; height: 20px; flex: 0 0 20px; }
+.google-login:disabled { opacity: .55; cursor: default; }
+.google-login:focus-visible { outline: 3px solid #8ab4f8; outline-offset: 3px; }
+.google-button-host { display: flex; justify-content: center; margin-top: 18px; min-height: 44px; max-width: 100%; }
+.google-button-host.busy { pointer-events: none; opacity: .6; }
+/* Keep the app's outline-icon stroke rules off Google's multicolor logo. */
+.google-button-host svg { stroke: none; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

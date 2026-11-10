@@ -1,3 +1,4 @@
+mod auth;
 mod music;
 mod reactions;
 mod storage;
@@ -118,6 +119,7 @@ struct Memory {
 
 struct LiveConnection {
     user_id: String,
+    token: String,
 }
 
 struct Inner {
@@ -134,6 +136,8 @@ struct App {
     events: Value,
     public_dir: PathBuf,
     music: MusicService,
+    auth: auth::GoogleAuth,
+    cookie_secure: bool,
 }
 
 type Shared = Arc<App>;
@@ -173,17 +177,22 @@ impl App {
     }
 }
 
-async fn authenticated(headers: &HeaderMap, store: &Store) -> ApiResult<User> {
-    let token = headers
+fn session_token(headers: &HeaderMap) -> Option<&str> {
+    headers
         .get(header::COOKIE)
         .and_then(|v| v.to_str().ok())
         .and_then(|cookies| {
             cookies
                 .split(';')
                 .find_map(|item| item.trim().strip_prefix("feswave="))
-        });
+        })
+        .filter(|t| t.len() <= 128)
+}
 
-    if let Some(token) = token.filter(|t| t.len() <= 128) {
+async fn authenticated(headers: &HeaderMap, store: &Store) -> ApiResult<User> {
+    let token = session_token(headers);
+
+    if let Some(token) = token {
         if let Some(user) = store.session_user(token).await? {
             return Ok(user);
         }
@@ -217,19 +226,15 @@ async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Res
             let token = id();
             app.store.create_session(&user, &token).await?;
 
-            (
-                user,
-                Some(format!(
-                    "feswave={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000"
-                )),
-            )
+            (user, Some(session_cookie(&app, &token, 31536000)))
         }
         Err(e) => return Err(e),
     };
 
     inner.users.insert(user.id.clone(), user.clone());
 
-    let mut response = Json(json!({"user":user,"events":app.events})).into_response();
+    let linked = app.store.linked(&user.id).await?;
+    let mut response = Json(json!({"user":user,"events":app.events,"account":{"google":linked},"google":app.auth.config})).into_response();
 
     if let Some(cookie) = cookie {
         response
@@ -237,6 +242,91 @@ async fn session(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Res
             .insert(header::SET_COOKIE, HeaderValue::from_str(&cookie).unwrap());
     }
 
+    Ok(response)
+}
+
+fn session_cookie(app: &App, token: &str, age: u64) -> String {
+    format!(
+        "feswave={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age={age}{}",
+        if app.cookie_secure { "; Secure" } else { "" }
+    )
+}
+
+fn auth_request(headers: &HeaderMap) -> ApiResult<()> {
+    // Non-simple header forces cross-origin browser requests through a CORS preflight.
+    if headers.get("x-feswave-auth").and_then(|v| v.to_str().ok()) != Some("1") {
+        return Err(error(
+            StatusCode::FORBIDDEN,
+            "同じサイトのログイン画面から操作してください",
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GoogleLoginInput {
+    id_token: String,
+}
+
+async fn google_challenge(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Json<Value>> {
+    auth_request(&headers)?;
+    authenticated(&headers, &app.store).await?;
+    if app.auth.config.is_none() {
+        return Err(error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Googleログインは準備中です。",
+        ));
+    }
+    let nonce = app
+        .store
+        .google_challenge(session_token(&headers).unwrap_or_default(), &id())
+        .await?;
+    Ok(Json(json!({"nonce":nonce})))
+}
+
+async fn google_login(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Json(input): Json<GoogleLoginInput>,
+) -> ApiResult<Response> {
+    auth_request(&headers)?;
+    let guest = authenticated(&headers, &app.store).await?;
+    let claims = app.auth.verify(&input.id_token).await?;
+    let token = id();
+    let old_token = session_token(&headers).unwrap_or_default();
+    let mut inner = app.inner.lock().await;
+    let user = app
+        .store
+        .google_login(&claims.sub, &guest.id, old_token, &token, &claims.nonce)
+        .await?;
+    inner
+        .clients
+        .retain(|_, client| client.token != old_token && client.user_id != guest.id);
+    inner.users.insert(user.id.clone(), user.clone());
+    drop(inner);
+    app.notify();
+    let mut response = Json(json!({"user":user})).into_response();
+    response.headers_mut().insert(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&session_cookie(&app, &token, 604800)).unwrap(),
+    );
+    Ok(response)
+}
+
+async fn logout(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Response> {
+    auth_request(&headers)?;
+    if let Some(token) = session_token(&headers) {
+        let mut inner = app.inner.lock().await;
+        app.store.delete_session(token).await?;
+        inner.clients.retain(|_, client| client.token != token);
+    }
+    app.notify();
+    let mut response = Json(json!({"ok":true})).into_response();
+    response.headers_mut().insert(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&session_cookie(&app, "", 0)).unwrap(),
+    );
     Ok(response)
 }
 
@@ -610,6 +700,7 @@ async fn stream(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Resp
         connection_id.clone(),
         LiveConnection {
             user_id: uid.clone(),
+            token: session_token(&headers).unwrap_or_default().to_owned(),
         },
     );
 
@@ -621,7 +712,7 @@ async fn stream(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Resp
 
     let guard = ConnectionGuard {
         app: app.clone(),
-        connection_id,
+        connection_id: connection_id.clone(),
     };
 
     let output = async_stream::stream! {
@@ -631,7 +722,10 @@ async fn stream(State(app): State<Shared>, headers: HeaderMap) -> ApiResult<Resp
         loop {
             match updates.recv().await {
                 Ok(()) | Err(broadcast::error::RecvError::Lagged(_)) => {
-                    let value = snapshot(&*app.inner.lock().await, &uid).to_string();
+                    let inner = app.inner.lock().await;
+                    if !inner.clients.contains_key(&connection_id) { break; }
+                    let value = snapshot(&inner, &uid).to_string();
+                    drop(inner);
                     yield Ok(Event::default().data(value));
                 }
                 Err(broadcast::error::RecvError::Closed) => break,
@@ -682,8 +776,10 @@ async fn static_file(State(app): State<Shared>, req: Request) -> Response {
         "/" => ("index.html", "text/html; charset=utf-8"),
         "/app.js" => ("app.js", "text/javascript; charset=utf-8"),
         "/music.js" => ("music.js", "text/javascript; charset=utf-8"),
+        "/auth.js" => ("auth.js", "text/javascript; charset=utf-8"),
         "/music.css" => ("music.css", "text/css; charset=utf-8"),
         "/itunes-badge.svg" => ("itunes-badge.svg", "image/svg+xml"),
+        "/google-g.png" => ("google-g.png", "image/png"),
         "/styles.css" => ("styles.css", "text/css; charset=utf-8"),
         "/app-shell.css" => ("app-shell.css", "text/css; charset=utf-8"),
         "/favicon.svg" => ("favicon.svg", "image/svg+xml"),
@@ -718,10 +814,11 @@ async fn security(req: Request, next: Next) -> Response {
     for (key, value) in [
         ("cache-control", "no-store"),
         ("x-content-type-options", "nosniff"),
-        ("referrer-policy", "same-origin"),
+        ("referrer-policy", "strict-origin-when-cross-origin"),
+        ("cross-origin-opener-policy", "same-origin-allow-popups"),
         (
             "content-security-policy",
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.mzstatic.com; connect-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+            "default-src 'self'; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: https://*.mzstatic.com https://accounts.google.com; connect-src 'self' https://accounts.google.com/gsi/; script-src 'self' https://accounts.google.com/gsi/client; frame-src https://accounts.google.com/gsi/; base-uri 'none'; frame-ancestors 'none'; object-src 'none'",
         ),
     ] {
         response.headers_mut().insert(
@@ -773,6 +870,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         events,
         public_dir: root.join("public"),
         music: MusicService::new()?,
+        auth: auth::GoogleAuth::new(auth::GoogleConfig::from_env()?)?,
+        cookie_secure: std::env::var("COOKIE_SECURE").is_ok_and(|v| v == "true"),
     });
 
     let ticker = app.clone();
@@ -790,19 +889,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let router = Router::new()
-        .route("/api/session", get(session))
-        .route("/api/profile", put(profile))
-        .route("/api/music/search", get(search_music))
-        .route("/api/join", post(join_event))
-        .route("/api/react", post(react))
-        .route("/api/stream", get(stream))
-        .route("/api/memories", get(memories))
-        .route("/api/memories/{id}", patch(favorite))
-        .fallback(static_file)
-        .layer(DefaultBodyLimit::max(8192))
-        .layer(middleware::from_fn(security))
-        .with_state(app);
+    let router = router(app);
 
     let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".into());
     let port = std::env::var("PORT").unwrap_or_else(|_| "3000".into());
@@ -818,3 +905,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+fn router(app: Shared) -> Router {
+    Router::new()
+        .route("/api/session", get(session))
+        .route("/api/auth/google", post(google_login))
+        .route("/api/auth/challenge", post(google_challenge))
+        .route("/api/auth/logout", post(logout))
+        .route("/api/profile", put(profile))
+        .route("/api/music/search", get(search_music))
+        .route("/api/join", post(join_event))
+        .route("/api/react", post(react))
+        .route("/api/stream", get(stream))
+        .route("/api/memories", get(memories))
+        .route("/api/memories/{id}", patch(favorite))
+        .fallback(static_file)
+        .layer(DefaultBodyLimit::max(16384))
+        .layer(middleware::from_fn(security))
+        .with_state(app)
+}
+
+#[cfg(test)]
+mod auth_tests;
