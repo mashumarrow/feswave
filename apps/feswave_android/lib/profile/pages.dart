@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../services.dart';
-import '../live/session.dart';
 import '../ui/shared.dart';
 import 'models.dart';
 
@@ -163,8 +162,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 }
 
 class ProfileEditor extends ConsumerStatefulWidget {
-  const ProfileEditor({super.key, this.joinAfterSave = false});
-  final bool joinAfterSave;
+  const ProfileEditor({super.key});
   @override
   ConsumerState<ProfileEditor> createState() => _Editor();
 }
@@ -228,36 +226,7 @@ class _Editor extends ConsumerState<ProfileEditor> {
             ),
           );
       if (!mounted) return;
-      if (widget.joinAfterSave) {
-        final enter = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('あなたのWAVEを、会場へ届けよう。'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.check_circle_outline, size: 48, color: lilac),
-                const SizedBox(height: 12),
-                Text(name.text.trim()),
-                const Text('プロフィールの登録が完了しました。', style: noteStyle),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('閉じる'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('ライブへ進む'),
-              ),
-            ],
-          ),
-        );
-        if (!mounted) return;
-        if (enter == true) await ref.read(liveProvider.notifier).join();
-      }
-      if (mounted) context.go(widget.joinAfterSave ? '/live' : '/profile');
+      context.go('/profile');
     } catch (e) {
       if (mounted) notice(context, e);
     } finally {
@@ -272,9 +241,7 @@ class _Editor extends ConsumerState<ProfileEditor> {
       Row(
         children: [
           TextButton(
-            onPressed: saving
-                ? null
-                : () => context.go(widget.joinAfterSave ? '/live' : '/profile'),
+            onPressed: saving ? null : () => context.go('/profile'),
             child: const Text('キャンセル'),
           ),
           Expanded(

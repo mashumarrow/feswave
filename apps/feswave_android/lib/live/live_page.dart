@@ -4,8 +4,6 @@ import 'package:flame/game.dart' show GameWidget;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../services.dart';
 import '../profile/models.dart';
 import '../ui/shared.dart';
 import '../ui/stage.dart';
@@ -14,7 +12,7 @@ import 'protocol.dart';
 import 'orbit.dart';
 
 class LivePage extends ConsumerStatefulWidget {
-  const LivePage({super.key, this.demoCount = 6});
+  const LivePage({super.key, this.demoCount = 0});
   final int demoCount;
   @override
   ConsumerState<LivePage> createState() => _LivePageState();
@@ -96,11 +94,11 @@ class _LivePageState extends ConsumerState<LivePage>
   Widget build(BuildContext context) {
     ref.watch(liveProvider);
     final session = ref.read(liveProvider.notifier);
-    final account = ref.watch(accountProvider).value;
+    final benchmark = widget.demoCount > 0;
     final people = session.people.values.toList()
       ..sort((a, b) => b.proximity.compareTo(a.proximity));
     final items = <({int id, Profile profile, double near, int level})>[
-      if (!session.joined)
+      if (benchmark)
         for (int i = 0; i < widget.demoCount.clamp(0, demo.length); i++)
           (id: i + 1, profile: demo[i].$1, near: demo[i].$2, level: demo[i].$3)
       else
@@ -113,10 +111,11 @@ class _LivePageState extends ConsumerState<LivePage>
           ),
     ];
     final reduced = MediaQuery.disableAnimationsOf(context);
-    final level = strength(session.taps[session.now ~/ slotMs] ?? 0);
+    final taps = session.taps[session.now ~/ slotMs] ?? 0;
+    final level = strength(taps);
     void react() {
       session.tap();
-      if (!session.joined) {
+      if (benchmark) {
         demoReset?.cancel();
         demoReset = Timer(
           Duration(milliseconds: slotMs - session.now % slotMs),
@@ -128,33 +127,6 @@ class _LivePageState extends ConsumerState<LivePage>
       setState(() => pulse++);
     }
 
-    Future<void> eventAction() async {
-      if (session.joined) {
-        final leave = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('FESWAVE FESTIVAL'),
-            content: const Text('TOKYO BAY · MAIN STAGE'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('ライブを退出'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('ライブに戻る'),
-              ),
-            ],
-          ),
-        );
-        if (leave == true) await session.leave();
-      } else if (account?.profile.name.trim().isEmpty ?? true) {
-        context.go('/profile/edit?join=1');
-      } else {
-        await session.join();
-      }
-    }
-
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       children: [
@@ -162,39 +134,25 @@ class _LivePageState extends ConsumerState<LivePage>
           'SAME MUSIC. SAME MOMENT.',
           'Live',
           Icons.graphic_eq,
-          'その高鳴りは、きっと誰かと同じ。',
+          '',
         ),
-        FestivalBanner(
-          joined: session.joined,
-          onPressed: session.busy || account == null ? null : eventAction,
-        ),
-        const SizedBox(height: 18),
         WavePanel(
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('●  LIVE REACTIONS', style: captionStyle),
-                      SizedBox(height: 5),
-                      Text('同じ瞬間、同じ気持ち。'),
-                    ],
-                  ),
-                ),
                 const Icon(Icons.people_outline, size: 16),
                 const SizedBox(width: 5),
                 Text(
-                  '${session.joined ? people.length : items.length}  ${session.joined ? "LIVE" : "DEMO"}',
+                  '${!benchmark ? people.length : items.length}  ${!benchmark ? "LIVE" : "DEMO"}',
                   style: captionStyle,
                 ),
               ],
             ),
             SizedBox(
-              height: (MediaQuery.sizeOf(context).height * .29).clamp(
-                210.0,
-                260.0,
+              height: (MediaQuery.sizeOf(context).height * .52).clamp(
+                350.0,
+                460.0,
               ),
               child: LayoutBuilder(
                 builder: (context, c) {
@@ -225,7 +183,7 @@ class _LivePageState extends ConsumerState<LivePage>
                               return AnimatedBuilder(
                                 animation: orbit,
                                 builder: (context, child) {
-                                  final angle = session.joined
+                                  final angle = !benchmark
                                       ? (item.id % 997) * 2 * math.pi / 997
                                       : item.id *
                                             2 *
@@ -245,7 +203,7 @@ class _LivePageState extends ConsumerState<LivePage>
                                 },
                                 child: AnimatedOpacity(
                                   opacity:
-                                      session.joined &&
+                                      !benchmark &&
                                           session.now -
                                                   (session
                                                           .people[item.id]
@@ -264,7 +222,7 @@ class _LivePageState extends ConsumerState<LivePage>
                                         child: GestureDetector(
                                           onTap: () async {
                                             try {
-                                              final p = session.joined
+                                              final p = !benchmark
                                                   ? await session.profileFor(
                                                       item.id,
                                                     )
@@ -273,7 +231,7 @@ class _LivePageState extends ConsumerState<LivePage>
                                                 await showPerson(
                                                   context,
                                                   p,
-                                                  demo: !session.joined,
+                                                  demo: benchmark,
                                                 );
                                               }
                                             } catch (e) {
@@ -312,7 +270,7 @@ class _LivePageState extends ConsumerState<LivePage>
                                               SizedBox(
                                                 width: 72,
                                                 child: Text(
-                                                  session.joined
+                                                  !benchmark
                                                       ? item.profile.name
                                                       : "${item.profile.name} · demo",
                                                   maxLines: 1,
@@ -419,15 +377,46 @@ class _LivePageState extends ConsumerState<LivePage>
               ),
             ),
             Text(
-              session.joined && people.isEmpty
+              !benchmark && people.isEmpty
                   ? '周辺の参加者を待っています。'
-                  : !session.joined && pulse > 0
+                  : benchmark && pulse > 0
                   ? 'デモ体験中 · 履歴には保存されません'
                   : '同じ音楽で、つながっている。',
               style: noteStyle,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
+            Row(
+              children: [
+                for (int i = 1; i <= 5; i++) ...[
+                  if (i > 1) const SizedBox(width: 6),
+                  Expanded(
+                    child: Container(
+                      height: 18,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(5),
+                        color: i <= level
+                            ? reactionColors[i]
+                            : const Color(0xff453449),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    taps == 0 ? 'タップして、盛り上がりをシェア' : '$taps taps · LEVEL $level',
+                    style: noteStyle,
+                  ),
+                ),
+                const Text('5 SEC', style: captionStyle),
+              ],
+            ),
+            const SizedBox(height: 16),
             DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(9),
@@ -451,62 +440,9 @@ class _LivePageState extends ConsumerState<LivePage>
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                for (int i = 1; i <= 5; i++)
-                  Container(
-                    width: 12,
-                    height: 4,
-                    margin: const EdgeInsets.only(right: 3),
-                    color: i <= level
-                        ? reactionColors[i]
-                        : const Color(0xff453449),
-                  ),
-                Expanded(child: Text('  LEVEL $level', style: captionStyle)),
-                const Text('5 SEC', style: captionStyle),
-              ],
-            ),
-            const Divider(height: 24),
-            Row(
-              children: [
-                for (int i = 1; i <= 5; i++)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Icon(Icons.circle, size: 5, color: reactionColors[i]),
-                        Text('Level $i', style: const TextStyle(fontSize: 10)),
-                        Text(
-                          i == 5 ? '21+ taps' : '${5 * i - 4}–${5 * i} taps',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: Colors.white60,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
             if (session.message.isNotEmpty) Text(session.message),
           ],
         ),
-        WavePanel(
-          children: [
-            const Text('♡  MOMENTS TO KEEP', style: captionStyle),
-            const SizedBox(height: 10),
-            const Text('今日の「同じ！」を、明日の思い出に。'),
-            const Text('同じタイミングのリアクションが、あなたのメモリに残ります。', style: noteStyle),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () => context.go('/memories'),
-                child: const Text('メモリを見る  →'),
-              ),
-            ),
-          ],
-        ),
-        const Text('ライブの主役は音楽。スマホは無理のない範囲で。', style: noteStyle),
         const WaveFooter(),
       ],
     );

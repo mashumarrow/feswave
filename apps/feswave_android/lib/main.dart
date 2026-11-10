@@ -31,12 +31,7 @@ final router = GoRouter(
               path: '/profile',
               builder: (_, _) => const ProfilePage(),
               routes: [
-                GoRoute(
-                  path: 'edit',
-                  builder: (_, state) => ProfileEditor(
-                    joinAfterSave: state.uri.queryParameters['join'] == '1',
-                  ),
-                ),
+                GoRoute(path: 'edit', builder: (_, _) => const ProfileEditor()),
               ],
             ),
           ],
@@ -145,8 +140,8 @@ class _ShellState extends ConsumerState<Shell> {
         return (s.gate, s.message, s.busy);
       }),
     );
-    final joined = ref.watch(
-      liveProvider.select((_) => ref.read(liveProvider.notifier).joined),
+    final active = ref.watch(
+      liveProvider.select((_) => ref.read(liveProvider.notifier).active),
     );
     final account = ref.watch(accountProvider);
     final ready = state.$1 == Gate.ready && account.hasValue;
@@ -156,11 +151,11 @@ class _ShellState extends ConsumerState<Shell> {
         actions: ready
             ? [
                 Text(
-                  joined ? '●  LIVE' : '●  DEMO MODE',
+                  active ? '●  LIVE' : '接続中',
                   style: TextStyle(
                     fontSize: 10,
                     letterSpacing: 1,
-                    color: joined ? cyan : pink,
+                    color: active ? cyan : pink,
                   ),
                 ),
                 IconButton(

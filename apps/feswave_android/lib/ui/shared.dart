@@ -214,7 +214,7 @@ class PageHeading extends StatelessWidget {
             Icon(icon, color: title == 'Live' ? cyan : pink, size: 26),
           ],
         ),
-        Text(description, style: noteStyle),
+        if (description.isNotEmpty) Text(description, style: noteStyle),
       ],
     ),
   );
@@ -245,28 +245,6 @@ class WavePanel extends StatelessWidget {
 class WaveFooter extends StatelessWidget {
   const WaveFooter({super.key});
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      const Text('FESWAVE  © 2026', style: captionStyle),
-      TextButton(
-        onPressed: () => showDialog<void>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('音楽でつながる、もっと近くに。'),
-            content: const Text(
-              'ライブ中に気持ちが動いたらタップ。近くにいる参加者と同じ5秒間に盛り上がり、双方が公開を許可していると、端末に共感メモリが残ります。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('閉じる'),
-              ),
-            ],
-          ),
-        ),
-        child: const Text('このアプリについて ↗', style: noteStyle),
-      ),
-    ],
-  );
+  Widget build(BuildContext context) =>
+      const Text('FESWAVE  © 2026', style: captionStyle);
 }

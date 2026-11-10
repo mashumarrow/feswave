@@ -26,11 +26,7 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
   Timer? timer;
   Gate gate = Gate.checking;
   String message = '';
-  bool joined = false,
-      active = false,
-      foreground = true,
-      busy = false,
-      refreshing = false;
+  bool active = false, foreground = true, busy = false, refreshing = false;
   int id = 0, lastSlot = -1, epoch = 0;
   int get now => DateTime.now().millisecondsSinceEpoch;
   Profile get me => ref.read(accountProvider).value?.profile ?? const Profile();
@@ -91,9 +87,10 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
       if (await Permission.locationWhenInUse.serviceStatus.isDisabled) {
         throw StateError('位置情報をオンにしてください');
       }
+      await ref.read(accountProvider.future);
       gate = Gate.ready;
       message = '';
-      if (joined && foreground && !active) await _serial(_start);
+      if (foreground && !active) await _serial(_start);
     } catch (e) {
       block(e.toString());
     } finally {
@@ -127,32 +124,8 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> join() async {
-    if (busy || gate != Gate.ready) return;
-    joined = true;
-    busy = true;
-    update();
-    try {
-      await _serial(_start);
-    } catch (e) {
-      block('BLEを開始できません · $e');
-    } finally {
-      busy = false;
-      update();
-    }
-  }
-
-  Future<void> leave() async {
-    joined = false;
-    active = false;
-    epoch++;
-    timer?.cancel();
-    await _serial(_stop);
-    update();
-  }
-
   Future<void> _start() async {
-    if (!foreground || !joined || active || gate != Gate.ready) return;
+    if (!foreground || active || gate != Gate.ready) return;
     final generation = epoch;
     id = Random.secure().nextInt(1 << 32);
     people.clear();
@@ -195,7 +168,7 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
     radio.revision,
   );
   void tap() {
-    if (joined && !active) return;
+    if (!active) return;
     final slot = now ~/ slotMs;
     taps[slot] = (taps[slot] ?? 0) + 1;
     update();
@@ -287,9 +260,12 @@ class LiveSession extends Notifier<int> with WidgetsBindingObserver {
       if (p.revision != revision || !identical(people[peer], p)) {
         throw StateError("プロフィールが更新されました");
       }
+      final display = profile.name.trim().isEmpty
+          ? profile.copyWith(name: hexId(peer))
+          : profile;
       p.profile = p.shared
-          ? profile
-          : profile.copyWith(visible: false).publicView;
+          ? display
+          : display.copyWith(visible: false).publicView;
       p.hasDetails = !summary;
       update();
       return p.profile!;
