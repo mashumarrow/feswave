@@ -114,6 +114,12 @@ class _LivePageState extends ConsumerState<LivePage>
     final reduced = MediaQuery.disableAnimationsOf(context);
     final gauge = benchmark ? demoGauge : session.gauge;
     final level = gauge.levelAt(session.now);
+    final view = View.of(context);
+    final viewportHeight =
+        (view.physicalSize.height -
+            view.viewPadding.top -
+            view.viewPadding.bottom) /
+        view.devicePixelRatio;
     void react() {
       if (benchmark) {
         demoGauge.tap(session.now);
@@ -131,20 +137,16 @@ class _LivePageState extends ConsumerState<LivePage>
     }
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 22),
       children: [
-        const PageHeading(
-          'SAME MUSIC. SAME MOMENT.',
-          'Live',
-          Icons.graphic_eq,
-          '',
-        ),
+        const PageHeading('SAME MUSIC. SAME MOMENT.', 'Live', 'wave', ''),
         WavePanel(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                const Icon(Icons.people_outline, size: 16),
+                const WaveIcon('people', size: 16, color: Color(0xffa793b9)),
                 const SizedBox(width: 5),
                 Text(
                   '${!benchmark ? people.length : items.length}  ${!benchmark ? "LIVE" : "DEMO"}',
@@ -153,240 +155,308 @@ class _LivePageState extends ConsumerState<LivePage>
               ],
             ),
             SizedBox(
-              height: (MediaQuery.sizeOf(context).height * .52).clamp(
-                350.0,
-                460.0,
-              ),
-              child: LayoutBuilder(
-                builder: (context, c) {
-                  final area = c.biggest;
-                  return DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: const RadialGradient(
-                        colors: [Color(0xff41204e), Color(0xff1b1129), panel],
-                        radius: .54,
-                      ),
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Positioned.fill(
-                          child: CustomPaint(painter: OrbitGrid(level)),
-                        ),
-                        for (final item in items)
-                          TweenAnimationBuilder<double>(
-                            key: ValueKey(item.id),
-                            tween: Tween(end: item.near),
-                            duration: reduced
-                                ? Duration.zero
-                                : const Duration(milliseconds: 1200),
-                            builder: (context, near, _) {
-                              final diameter = 30 + near * 18;
-                              return AnimatedBuilder(
-                                animation: orbit,
-                                builder: (context, child) {
-                                  final angle = !benchmark
-                                      ? (item.id % 997) * 2 * math.pi / 997
-                                      : item.id *
-                                            2 *
-                                            math.pi /
-                                            widget.demoCount;
-                                  final point = orbitPoint(
-                                    area,
-                                    reduced ? 0 : orbit.value,
-                                    near,
-                                    angle,
-                                  );
-                                  game.points[item.id] = point;
-                                  return Transform.translate(
-                                    offset: point - area.center(Offset.zero),
-                                    child: child,
-                                  );
-                                },
-                                child: AnimatedOpacity(
-                                  opacity:
-                                      !benchmark &&
-                                          session.now -
-                                                  (session
-                                                          .people[item.id]
-                                                          ?.last ??
-                                                      session.now) >
-                                              13500
-                                      ? 0
-                                      : 1,
-                                  duration: reduced
-                                      ? Duration.zero
-                                      : const Duration(milliseconds: 800),
-                                  child:
-                                      Semantics(
-                                        button: true,
-                                        label: '${item.profile.name}のプロフィール',
-                                        child: GestureDetector(
-                                          onTap: () async {
-                                            try {
-                                              final p = !benchmark
-                                                  ? await session.profileFor(
-                                                      item.id,
-                                                    )
-                                                  : item.profile;
-                                              if (context.mounted) {
-                                                await showPerson(
-                                                  context,
-                                                  p,
-                                                  demo: benchmark,
-                                                );
-                                              }
-                                            } catch (e) {
-                                              if (context.mounted) {
-                                                notice(context, e);
-                                              }
-                                            }
-                                          },
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              DecoratedBox(
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  boxShadow: [
-                                                    if (item.level > 0)
-                                                      BoxShadow(
-                                                        color:
-                                                            tint(
-                                                              item
-                                                                  .profile
-                                                                  .color,
-                                                            ).withValues(
-                                                              alpha: .23,
-                                                            ),
-                                                        blurRadius:
-                                                            4 + item.level * 2,
+              height: (viewportHeight * .52).clamp(350.0, 460.0),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: FractionallySizedBox(
+                      heightFactor: .92,
+                      alignment: Alignment.topCenter,
+                      child: LayoutBuilder(
+                        builder: (context, c) {
+                          final area = c.biggest;
+                          return DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: const RadialGradient(
+                                colors: [Color(0xff25172f), panel, panel],
+                                radius: .54,
+                              ),
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Positioned.fill(
+                                  child: CustomPaint(painter: OrbitGrid(level)),
+                                ),
+                                for (final item in items)
+                                  TweenAnimationBuilder<double>(
+                                    key: ValueKey(item.id),
+                                    tween: Tween(end: item.near),
+                                    duration: reduced
+                                        ? Duration.zero
+                                        : const Duration(milliseconds: 1200),
+                                    builder: (context, near, _) {
+                                      final diameter = 34 + near * 17;
+                                      return AnimatedBuilder(
+                                        animation: orbit,
+                                        builder: (context, child) {
+                                          final angle = !benchmark
+                                              ? (item.id % 997) *
+                                                    2 *
+                                                    math.pi /
+                                                    997
+                                              : item.id *
+                                                    2 *
+                                                    math.pi /
+                                                    widget.demoCount;
+                                          final point = orbitPoint(
+                                            area,
+                                            reduced ? 0 : orbit.value,
+                                            near,
+                                            angle,
+                                          );
+                                          game.points[item.id] = point;
+                                          return Transform.translate(
+                                            offset:
+                                                point -
+                                                area.center(Offset.zero),
+                                            child: child,
+                                          );
+                                        },
+                                        child: AnimatedOpacity(
+                                          opacity:
+                                              !benchmark &&
+                                                  session.now -
+                                                          (session
+                                                                  .people[item
+                                                                      .id]
+                                                                  ?.last ??
+                                                              session.now) >
+                                                      13500
+                                              ? 0
+                                              : 1,
+                                          duration: reduced
+                                              ? Duration.zero
+                                              : const Duration(
+                                                  milliseconds: 800,
+                                                ),
+                                          child:
+                                              Semantics(
+                                                button: true,
+                                                label:
+                                                    '${item.profile.name}のプロフィール',
+                                                child: GestureDetector(
+                                                  onTap: () async {
+                                                    try {
+                                                      final p = !benchmark
+                                                          ? await session
+                                                                .profileFor(
+                                                                  item.id,
+                                                                )
+                                                          : item.profile;
+                                                      if (context.mounted) {
+                                                        await showPerson(
+                                                          context,
+                                                          p,
+                                                          demo: benchmark,
+                                                        );
+                                                      }
+                                                    } catch (e) {
+                                                      if (context.mounted) {
+                                                        notice(context, e);
+                                                      }
+                                                    }
+                                                  },
+                                                  child: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      DecoratedBox(
+                                                        decoration: BoxDecoration(
+                                                          shape:
+                                                              BoxShape.circle,
+                                                          boxShadow: [
+                                                            if (item.level > 0)
+                                                              BoxShadow(
+                                                                color:
+                                                                    tint(
+                                                                      item
+                                                                          .profile
+                                                                          .color,
+                                                                    ).withValues(
+                                                                      alpha:
+                                                                          .23,
+                                                                    ),
+                                                                blurRadius:
+                                                                    4 +
+                                                                    item.level *
+                                                                        2,
+                                                              ),
+                                                          ],
+                                                        ),
+                                                        child: Avatar(
+                                                          item.profile,
+                                                          size: diameter,
+                                                        ),
                                                       ),
-                                                  ],
-                                                ),
-                                                child: Avatar(
-                                                  item.profile,
-                                                  size: diameter,
-                                                ),
-                                              ),
-                                              SizedBox(
-                                                width: 72,
-                                                child: Text(
-                                                  !benchmark
-                                                      ? item.profile.name
-                                                      : "${item.profile.name} · demo",
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  textAlign: TextAlign.center,
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
+                                                      const SizedBox(height: 5),
+                                                      SizedBox(
+                                                        width: 78,
+                                                        child: Text(
+                                                          !benchmark
+                                                              ? item
+                                                                    .profile
+                                                                    .name
+                                                              : "${item.profile.name} · demo",
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 9,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
+                                              ).animate().fadeIn(
+                                                duration: reduced
+                                                    ? Duration.zero
+                                                    : 320.ms,
                                               ),
-                                            ],
-                                          ),
                                         ),
-                                      ).animate().fadeIn(
-                                        duration: reduced
-                                            ? Duration.zero
-                                            : 320.ms,
-                                      ),
+                                      );
+                                    },
+                                  ),
+                                if (!reduced && pulse > 0)
+                                  IgnorePointer(
+                                    child:
+                                        Container(
+                                              width: 80,
+                                              height: 80,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: pink,
+                                                  width: 3.5,
+                                                ),
+                                              ),
+                                            )
+                                            .animate(
+                                              key: ValueKey('ring$pulse'),
+                                            )
+                                            .scale(
+                                              begin: const Offset(.8, .8),
+                                              end: const Offset(1.55, 1.55),
+                                              duration: 360.ms,
+                                            )
+                                            .fadeOut(duration: 360.ms),
+                                  ),
+                                Semantics(
+                                  button: true,
+                                  label: 'リアクション',
+                                  child: GestureDetector(
+                                    onTap: react,
+                                    child:
+                                        Container(
+                                              width: 91,
+                                              height: 91,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: level == 0
+                                                      ? const Color(0xffcf85e0)
+                                                      : reactionColors[level],
+                                                  width: 3.5,
+                                                ),
+                                                gradient: const RadialGradient(
+                                                  center: Alignment(-.25, -.35),
+                                                  radius: .94,
+                                                  colors: [
+                                                    Color(0xff642365),
+                                                    Color(0xff21122e),
+                                                    Color(0xff9748bd),
+                                                  ],
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: reactionColors[level]
+                                                        .withValues(alpha: .48),
+                                                    blurRadius: 19,
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Center(
+                                                child:
+                                                    session
+                                                            .me
+                                                            .favorite
+                                                            ?.artworkUrl !=
+                                                        null
+                                                    ? Avatar(
+                                                        session.me,
+                                                        size: 81,
+                                                      )
+                                                    : WaveIcon(
+                                                        'music',
+                                                        size: 34,
+                                                        color: level == 0
+                                                            ? const Color(
+                                                                0xffbaa3c4,
+                                                              )
+                                                            : reactionColors[level],
+                                                      ),
+                                              ),
+                                            )
+                                            .animate(
+                                              key: ValueKey(pulse),
+                                              target: reduced ? 0 : 1,
+                                            )
+                                            .scale(
+                                              begin: const Offset(.88, .88),
+                                              end: const Offset(1, 1),
+                                              duration: 240.ms,
+                                            ),
+                                  ),
                                 ),
-                              );
-                            },
-                          ),
-                        if (!reduced && pulse > 0)
-                          IgnorePointer(
-                            child:
-                                Container(
-                                      width: 80,
-                                      height: 80,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: pink,
-                                          width: 2,
-                                        ),
+                                IgnorePointer(
+                                  child: Transform.translate(
+                                    offset: const Offset(0, 60),
+                                    child: Text(
+                                      'YOU   LEVEL $level',
+                                      style: const TextStyle(
+                                        fontSize: 8,
+                                        letterSpacing: 1.4,
+                                        color: Color(0xffc6abc9),
                                       ),
-                                    )
-                                    .animate(key: ValueKey('ring$pulse'))
-                                    .scale(
-                                      begin: const Offset(.8, .8),
-                                      end: const Offset(1.55, 1.55),
-                                      duration: 360.ms,
-                                    )
-                                    .fadeOut(duration: 360.ms),
-                          ),
-                        Semantics(
-                          button: true,
-                          label: 'リアクション',
-                          child: GestureDetector(
-                            onTap: react,
-                            child:
-                                Container(
-                                      width: 61,
-                                      height: 61,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: reactionColors[level],
-                                          width: 2,
-                                        ),
-                                        gradient: const RadialGradient(
-                                          center: Alignment(-.25, -.35),
-                                          radius: .94,
-                                          colors: [
-                                            Color(0xff642365),
-                                            Color(0xff21122e),
-                                            Color(0xff9748bd),
-                                          ],
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: reactionColors[level]
-                                                .withValues(alpha: .48),
-                                            blurRadius: 19,
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.music_note_outlined,
-                                          color: Colors.white,
-                                          size: 34,
-                                        ),
-                                      ),
-                                    )
-                                    .animate(
-                                      key: ValueKey(pulse),
-                                      target: reduced ? 0 : 1,
-                                    )
-                                    .scale(
-                                      begin: const Offset(.88, .88),
-                                      end: const Offset(1, 1),
-                                      duration: 240.ms,
                                     ),
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: IgnorePointer(child: GameWidget(game: game)),
-                        ),
-                      ],
+                                  ),
+                                ),
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    child: GameWidget(game: game),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  );
-                },
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Text(
+                      !benchmark && people.isEmpty
+                          ? '周辺の参加者を待っています。'
+                          : benchmark && pulse > 0
+                          ? 'デモ体験中 · 履歴には保存されません'
+                          : '同じ音楽で、つながっている。',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: Color(0xffa198af),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            Text(
-              !benchmark && people.isEmpty
-                  ? '周辺の参加者を待っています。'
-                  : benchmark && pulse > 0
-                  ? 'デモ体験中 · 履歴には保存されません'
-                  : '同じ音楽で、つながっている。',
-              style: noteStyle,
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Row(
@@ -412,7 +482,7 @@ class _LivePageState extends ConsumerState<LivePage>
               alignment: Alignment.centerLeft,
               child: Text(
                 level == 0 ? 'タップして、盛り上がりをシェア' : 'LEVEL $level',
-                style: noteStyle,
+                style: const TextStyle(fontSize: 9, color: Color(0xffa198af)),
               ),
             ),
             const SizedBox(height: 16),
@@ -426,7 +496,8 @@ class _LivePageState extends ConsumerState<LivePage>
               ),
               child: TextButton.icon(
                 onPressed: react,
-                icon: const Icon(Icons.touch_app_outlined, color: cyan),
+                style: TextButton.styleFrom(minimumSize: const Size(0, 64)),
+                icon: const WaveIcon('tap', size: 26, color: Color(0xffb3cdf8)),
                 label: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -434,7 +505,10 @@ class _LivePageState extends ConsumerState<LivePage>
                       'Tap to React  ✧',
                       style: TextStyle(fontSize: 18, color: Colors.white),
                     ),
-                    Text('今の気持ちを、タップで届けよう', style: noteStyle),
+                    Text(
+                      '今の気持ちを、タップで届けよう',
+                      style: TextStyle(fontSize: 9, color: Color(0xffaca0ba)),
+                    ),
                   ],
                 ),
               ),

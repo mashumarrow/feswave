@@ -26,6 +26,7 @@ dependencies:
   wakelock_plus: ^1.4.0
   flutter:
     sdk: flutter
+  flutter_svg: ^2.3.2
 
 dev_dependencies:
   drift_dev: 2.34.0
@@ -38,3 +39,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/google-g.png

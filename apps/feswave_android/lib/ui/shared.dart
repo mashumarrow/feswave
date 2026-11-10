@@ -1,10 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../profile/models.dart';
 
 const ink = Color(0xff090911),
-    panel = Color(0xff14111e),
+    panel = Color(0xff11111c),
     cyan = Color(0xff37d5f7),
     pink = Color(0xfff14be5),
     lilac = Color(0xffaa75ff);
@@ -14,6 +15,24 @@ Color tint(String color) => switch (color) {
   'purple' => lilac,
   _ => pink,
 };
+
+class WaveIcon extends StatelessWidget {
+  const WaveIcon(this.name, {super.key, this.size = 21, this.color});
+  final String name;
+  final double size;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) => SvgPicture.asset(
+    'assets/icons/$name.svg',
+    width: size,
+    height: size,
+    colorFilter: ColorFilter.mode(
+      color ?? IconTheme.of(context).color ?? Colors.white,
+      BlendMode.srcIn,
+    ),
+    excludeFromSemantics: true,
+  );
+}
 
 class Avatar extends StatelessWidget {
   const Avatar(this.p, {super.key, this.size = 48});
@@ -61,7 +80,7 @@ class Avatar extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: color.withValues(alpha: .75), width: 1.5),
       ),
-      padding: const EdgeInsets.all(2),
+      padding: EdgeInsets.zero,
       child: ClipOval(
         child: url == null
             ? fallback
@@ -192,45 +211,73 @@ class PageHeading extends StatelessWidget {
     super.key,
   });
   final String kicker, title, description;
-  final IconData icon;
+  final String icon;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 18),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(kicker, style: captionStyle),
+        Text(
+          kicker,
+          style: const TextStyle(
+            fontSize: 8,
+            letterSpacing: 1.4,
+            color: Color(0xffae91c9),
+          ),
+        ),
+        const SizedBox(height: 7),
         Row(
           children: [
             Text(
               title,
               style: const TextStyle(
-                fontSize: 32,
+                fontSize: 30,
+                height: 1.2,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -1,
               ),
             ),
             const SizedBox(width: 9),
-            Icon(icon, color: title == 'Live' ? cyan : pink, size: 26),
+            WaveIcon(
+              icon,
+              color: title == 'Live' ? cyan : pink,
+              size: title == 'Live' ? 33 : 25,
+            ),
           ],
         ),
-        if (description.isNotEmpty) Text(description, style: noteStyle),
+        const SizedBox(height: 9),
+        if (description.isNotEmpty)
+          Text(
+            description,
+            style: const TextStyle(
+              fontSize: 10,
+              height: 1.7,
+              color: Color(0xff938c9f),
+            ),
+          ),
       ],
     ),
   );
 }
 
 class WavePanel extends StatelessWidget {
-  const WavePanel({super.key, required this.children, this.center = false});
+  const WavePanel({
+    super.key,
+    required this.children,
+    this.center = false,
+    this.padding = const EdgeInsets.all(16),
+  });
   final List<Widget> children;
   final bool center;
+  final EdgeInsets padding;
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.all(16),
+    padding: padding,
     decoration: BoxDecoration(
       color: panel,
-      border: Border.all(color: const Color(0xff35283e)),
+      border: Border.all(color: const Color(0xff242331)),
       borderRadius: BorderRadius.circular(11),
     ),
     child: Column(

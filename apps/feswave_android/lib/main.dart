@@ -8,7 +8,6 @@ import 'profile/pages.dart';
 import 'memories/page.dart';
 import 'services.dart';
 import 'ui/shared.dart';
-import 'ui/stage.dart';
 
 void main() => runApp(const ProviderScope(child: Feswave()));
 final router = GoRouter(
@@ -161,36 +160,29 @@ class _ShellState extends ConsumerState<Shell> {
                 IconButton(
                   tooltip: 'プロフィール',
                   onPressed: () => context.go('/profile'),
-                  icon: const Icon(Icons.person_outline, size: 20),
+                  icon: const WaveIcon('user', size: 17),
                 ),
               ]
             : null,
-        toolbarHeight: 56,
+        scrolledUnderElevation: 0,
+        titleSpacing: 20,
+        toolbarHeight: 57,
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1),
         ),
-        title: const Row(
-          children: [
-            CustomPaint(size: Size(27, 23), painter: WaveMark(cyan)),
-            SizedBox(width: 8),
-            Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: 'FES'),
-                  TextSpan(
-                    text: 'WAVE',
-                    style: TextStyle(color: Color(0xffe477fa)),
-                  ),
-                ],
-              ),
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.1,
-                fontSize: 20,
-              ),
+        title: ShaderMask(
+          shaderCallback: (bounds) =>
+              const LinearGradient(colors: [cyan, pink]).createShader(bounds),
+          child: const Text(
+            'FESWAVE',
+            style: TextStyle(
+              fontSize: 15,
+              letterSpacing: 1,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
             ),
-          ],
+          ),
         ),
       ),
       body: SafeArea(
@@ -233,18 +225,9 @@ class _ShellState extends ConsumerState<Shell> {
               selectedIndex: widget.shell.currentIndex,
               onDestinationSelected: widget.shell.goBranch,
               destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.graphic_eq),
-                  label: 'ライブ',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.favorite_border),
-                  label: 'メモリ',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  label: 'プロフィール',
-                ),
+                NavigationDestination(icon: WaveIcon('live'), label: 'ライブ'),
+                NavigationDestination(icon: WaveIcon('heart'), label: 'メモリ'),
+                NavigationDestination(icon: WaveIcon('user'), label: 'プロフィール'),
               ],
             )
           : null,
