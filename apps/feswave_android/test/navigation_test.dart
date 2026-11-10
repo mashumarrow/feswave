@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:feswave_android/live/session.dart';
+import 'package:feswave_android/live/live_page.dart';
 import 'package:feswave_android/main.dart';
 import 'package:feswave_android/profile/api.dart';
 import 'package:feswave_android/profile/models.dart';
@@ -35,6 +36,43 @@ class _SearchApi extends ProfileApi {
 }
 
 void main() {
+  testWidgets(
+    'stage corners and caption react; a participant opens their profile',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            liveProvider.overrideWith(_BlockedSession.new),
+            accountProvider.overrideWith(_Guest.new),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: LivePage(demoCount: 1)),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      for (final point in const [
+        Offset(5, 5),
+        Offset(795, 5),
+        Offset(5, 595),
+        Offset(795, 595),
+        Offset(400, 300),
+      ]) {
+        await tester.tapAt(point);
+        await tester.pump();
+      }
+      await tester.tapAt(tester.getCenter(find.text('Tap to react')));
+      await tester.pump();
+      expect(find.text('LEVEL 2'), findsOneWidget);
+      await tester.tap(find.text('haru · demo'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byTooltip('閉じる'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    },
+  );
+
   testWidgets('権限なしで履歴の絞り込みとプロフィール編集ができる', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
