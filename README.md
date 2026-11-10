@@ -7,14 +7,14 @@
 
 ライブで思わず手を叩きたくなった瞬間に、スマホの画面をタップ。近くの人も同じタイミングで盛り上がると、その人の好きな曲が「共感メモリ」として端末に残ります。Android向けのオープンソースアプリです。
 
-[デモAPKをダウンロード](https://github.com/mashumarrow/feswave/releases/download/v0.1.0/feswave-demo-arm64.apk) · [リリース一覧](https://github.com/mashumarrow/feswave/releases) · [MITライセンス](LICENSE)
+[最新版APKをダウンロード](https://github.com/mashumarrow/feswave/releases/latest/download/feswave-android-arm64.apk) · [リリース一覧](https://github.com/mashumarrow/feswave/releases) · [MITライセンス](LICENSE)
 
 ## 2台で試す
 
-デモAPKはarm64用のデバッグビルドです。Android 12以上で、Bluetooth LE（BLE）の広告とスキャンに対応するスマホを2台用意します。ライブと共感メモリは、ゲストのままサーバーなしで試せます。
+配布APKはarm64用の署名付きリリースビルドです。Android 12以上で、Bluetooth LE（BLE）の広告とスキャンに対応するスマホを2台用意します。ライブと共感メモリは、ゲストのままサーバーなしで試せます。
 
 1. 両方の端末にAPKをインストールし、Bluetooth・位置情報・自動日時設定をオンにします。
-2. プロフィールで「好きな曲とアイコンを公開」をオンにします。デモAPKでは、インターネットに接続すると公開APIで曲を検索できます。
+2. プロフィールで「好きな曲とアイコンを公開」をオンにします。配布APKでは、インターネットに接続すると公開APIで曲を検索できます。
 3. 「ライブを始める」を押し、付近のデバイスと正確な位置情報の権限を許可します。2台を近くに置き、ライブ画面に相手が現れるまで待ちます。
 4. 2台でライブ画面を同じタイミングでタップします。近接とリアクションの条件を満たすと、受信した端末の「メモリ」で記録を見返せます。
 
@@ -59,7 +59,7 @@ cargo run --locked
 
 ソースから起動した場合の既定のAPI接続先は `http://127.0.0.1:3000/api/` です。USB接続では別のターミナルから端末ごとに `adb -s DEVICE_ID reverse tcp:3000 tcp:3000` を実行します。別のサーバーに接続する場合は、ビルド時に `--dart-define=API_BASE_URL=https://your-host/api/` を指定します。
 
-Googleログインを使う場合は、アプリID `jp.feswave.feswave_android` とAPK署名のSHA-1に対応するAndroid OAuthクライアントを登録し、同じGoogle CloudプロジェクトのWebクライアントIDをAPIの `GOOGLE_CLIENT_ID` に設定します。HTTPSで公開する場合は `COOKIE_SECURE=true` を設定し、APKには配布用の署名を設定してください。
+Googleログインを使う場合は、アプリID `jp.feswave.feswave_android` とAPK署名のSHA-1に対応するAndroid OAuthクライアントを登録し、同じGoogle CloudプロジェクトのWebクライアントIDをAPIの `GOOGLE_CLIENT_ID` に設定します。HTTPSで公開する場合は `COOKIE_SECURE=true` を設定してください。
 
 配布用APKは東京リージョンのCloud Run上のAPIを使用します。[本番構成とデプロイ手順](infra/README.md)
 

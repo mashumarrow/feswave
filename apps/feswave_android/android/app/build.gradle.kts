@@ -30,11 +30,18 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("distribution") {
+            storeFile = System.getenv("ANDROID_RELEASE_STORE")?.let { file(it) }
+            storePassword = System.getenv("ANDROID_RELEASE_PASSWORD")
+            keyAlias = "feswave"
+            keyPassword = storePassword
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("distribution")
         }
     }
 }
