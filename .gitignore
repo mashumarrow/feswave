@@ -8,3 +8,9 @@ public/app.js
 public/types.js
 public/music.js
 public/auth.js
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan
+gha-creds-*.json
